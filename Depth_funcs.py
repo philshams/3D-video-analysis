@@ -31,7 +31,7 @@ def create_global_matchers(window_size = 1, min_disparity = 64, num_disparities 
     return stereo_left, stereo_right, min_disparity, shift_pixels
 
     
-def get_background_mean(file_name = '', file_loc = '', avg_over_approx = 10000):
+def get_background_mean(file_name = '', file_loc = '', avg_over_approx = 1000):
     save_file = file_loc + 'background_mat_avg.npy'
     if os.path.isfile(save_file):
         raise Exception('File already exists') 
@@ -49,7 +49,7 @@ def get_background_mean(file_name = '', file_loc = '', avg_over_approx = 10000):
     i = 0
     j = 0
     k = 0
-    done_marker = np.arange(0,100,10)
+    done_marker = np.arange(0,110,10)
     
     print('computing mean background...')
     
@@ -63,9 +63,11 @@ def get_background_mean(file_name = '', file_loc = '', avg_over_approx = 10000):
             j+= 1
             
             percent_there = int(100*j/avg_multiplier)
-            print(j)
+            #print(j)
             if percent_there%10==0 and percent_there == done_marker[k]:
                 print(str(done_marker[k]) + '% done')
+                if done_marker[k] == 100:
+                    break
                 k+=1
 
         if vid.get(cv2.CAP_PROP_POS_FRAMES)+1 == vid.get(cv2.CAP_PROP_FRAME_COUNT):
@@ -253,3 +255,17 @@ def get_biggest_contour(frame):
 #code for angle analysis
 #print('L angle = ' + str(np.arctan(vyL/vxL)) + 'R angle = ' + str(np.arctan(vyR/vxR)))
 #if (np.arctan(vyL/vxL) - np.arctan(vyR/vxR)) < 1.3: #less than 75 deg off
+        
+#code for ellipse over mouse
+        #        #get spine slope of mouse
+#        _, contours_stereo, _ = cv2.findContours(stereo_image_cropped_combined_gauss, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+#       
+#        #calculate slope to get spine alignment of mouse
+#        corr = np.corrcoef(np.squeeze(contours_stereo[0]).T)        
+#        x = 225
+#        y = 225
+#        if np.abs(corr[0,1]) > .031:  #if corr coeff under certain value, use previous slope
+#            [vxR,vyR,x,y] = cv2.fitLine(cntR, cv2.DIST_L2,0,0.01,0.01)
+#            [vxL,vyL,x,y] = cv2.fitLine(cntL, cv2.DIST_L2,0,0.01,0.01)
+#            slope_recipr = np.mean([(vxL/vyL),(vxR/vyR)])
+        #stereo_image_cropped_combined_gauss = cv2.line(stereo_image_cropped_combined_gauss,(int(225-225*(slope_recipr)),0),(int(225+225*(slope_recipr)),450),(100,10,10),3)
