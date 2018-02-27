@@ -193,6 +193,99 @@ def get_biggest_contour(frame):
     return contours, big_cnt_ind, cx, cy, cnt
     
     
+def flip_mouse(face_left, ellipse, topright_or_botleft, stereo_image_cropped_combined_gauss, sausage_thresh = 1.1):
+    #get ellipse of mouse
+    prev_ellipse = ellipse
+    topright_or_botleft_prev = topright_or_botleft
+
+    _, contours_stereo, _ = cv2.findContours(stereo_image_cropped_combined_gauss, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)        
+    
+    ellipse = cv2.fitEllipse(contours_stereo[0])
+    ellipse_width = (ellipse[1][1] / ellipse[1][0])
+    if ellipse_width < sausage_thresh:
+        ellipse = prev_ellipse   
+
+    #prevent flips of orientation, when the mouse is sufficiently sausage-like
+    topright_or_botleft = np.sign(np.cos(np.deg2rad(ellipse[2])))
+    if topright_or_botleft_prev != topright_or_botleft and (not 50 < ellipse[2] < 130):
+        face_left*=-1
+        #print('face_swap!') 
+        
+    #rotate the mouse accordingly    
+    if face_left == 1:
+        rotate_angle = (ellipse[2]-180)
+    else:
+        rotate_angle = ellipse[2]
+    
+    return rotate_angle, face_left, ellipse, topright_or_botleft, ellipse_width
+
+
+def correct_flip(initiation, face_left, stereo_top,stereo_bottom, depth_percentile, depth_ratio, history_x, history_y, cxL, cyL, ellipse, ellipse_width, \
+                 width_thresh=1.2, speed_thresh=40, depth_ratio_thresh = [.8, .7, .6], pixel_value_thresh = [109,89,69]):
+    #calculate depth image stats
+    major_top_avg = np.percentile(stereo_top[stereo_top>0], depth_percentile) 
+    major_bottom_avg = np.percentile(stereo_bottom[stereo_bottom>0], depth_percentile) 
+    
+    depth_ratio[0:2] = depth_ratio[1:3]
+    depth_ratio[2] = major_top_avg / major_bottom_avg
+    
+    x_tip = face_left*.5*ellipse[1][1]*np.cos(np.deg2rad(ellipse[2]+90))
+    y_tip = face_left*.5*ellipse[1][1]*np.sin(np.deg2rad(ellipse[2]+90))
+    
+    history_x[0:3] = history_x[1:4]
+    history_y[0:3] = history_y[1:4]
+    history_x[3] = cxL
+    history_y[3] = cyL
+    
+    delta_x = cxL - history_x[0]
+    delta_y = cyL - history_y[0]
+    speed = np.sqrt((delta_x)**2 + (delta_y)**2)
+#    heading = [(delta_x+.001) / (speed+.001), (delta_y+.001) / (speed+.001)]
+    
+    vec_length = np.sqrt(x_tip**2+y_tip**2)
+#    head_dir_putative = [x_tip/vec_length,-y_tip/vec_length]
+#    direction_dot = np.dot(heading,head_dir_putative)    
+    flip = 0
+
+#    if ellipse_width > width_thresh and speed < speed_thresh and ( (np.all(depth_ratio < depth_ratio_thresh[0]) and major_bottom_avg > pixel_value_thresh[0]) \
+#                                               or (np.all(depth_ratio < depth_ratio_thresh[1]) and major_bottom_avg > pixel_value_thresh[1]) \
+#                                               or (np.all(depth_ratio < depth_ratio_thresh[2]) and major_bottom_avg > pixel_value_thresh[2])):
+        
+    if ellipse_width > width_thresh and ( (np.median(depth_ratio) < depth_ratio_thresh[0] and major_bottom_avg > pixel_value_thresh[0]) \
+                                               or (np.median(depth_ratio) < depth_ratio_thresh[1] and major_bottom_avg > pixel_value_thresh[1]) \
+                                               or (np.median(depth_ratio) < depth_ratio_thresh[2] and major_bottom_avg > pixel_value_thresh[2])):
+                                               #speed here 20 works
+        face_left *= -1
+        flip = 1
+        print('face_HEIGHT_correction!')
+        print(depth_ratio)
+        if major_bottom_avg < pixel_value_thresh[0]:
+            print('at low pixel value' + str(major_bottom_avg))
+        print('')
+
+#    elif speed > speed_thresh and direction_dot < 0 and ellipse_width > width_thresh+.2  and initiation > 7: #speed here 50 works but always off
+#        face_left *= -1
+#        flip = 1
+#        print('face_SPEED_correction!')
+#        #print(history_x)
+#        print(speed)
+       
+
+    if face_left == 1:
+        rotate_angle = (ellipse[2]-180)
+    else:
+        rotate_angle = ellipse[2]
+        
+    x_tip = face_left*.5*ellipse[1][1]*np.cos(np.deg2rad(ellipse[2]+90))
+    y_tip = face_left*.5*ellipse[1][1]*np.sin(np.deg2rad(ellipse[2]+90))   
+    
+    return rotate_angle, face_left, depth_ratio, history_x, history_y, x_tip, y_tip, flip
+
+    
+    
+    
+    
+    
     
     
     
@@ -269,3 +362,25 @@ def get_biggest_contour(frame):
 #            [vxL,vyL,x,y] = cv2.fitLine(cntL, cv2.DIST_L2,0,0.01,0.01)
 #            slope_recipr = np.mean([(vxL/vyL),(vxR/vyR)])
         #stereo_image_cropped_combined_gauss = cv2.line(stereo_image_cropped_combined_gauss,(int(225-225*(slope_recipr)),0),(int(225+225*(slope_recipr)),450),(100,10,10),3)
+        
+        
+        #head-dir debug prints
+#        print('head-up stats')
+#        print(depth_ratio)
+#        print(major_bottom_avg)
+#        print(major_top_avg)
+#        print(ellipse_width)       
+#        print('x,y movement')
+#        print(delta_x)
+#        print(delta_y)
+#        print('speed')
+#        print(speed)
+#        print('heading')
+#        print(heading)
+#        
+#        print('put head dir')
+#        print(head_dir_putative)
+#        
+#        print('dot_product')
+#        print(np.dot(heading,head_dir_putative))
+#        print('')

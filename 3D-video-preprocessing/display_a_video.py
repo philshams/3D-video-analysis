@@ -19,7 +19,7 @@ display_frame_rate = 20
 #cv2.destroyAllWindows()
 #%%
 
-vid = cv2.VideoCapture(file_loc + 'test_snip_data.avi')  
+vid = cv2.VideoCapture(file_loc + 'first_rundata.avi')  
 
 start_frame = 1
 end_frame = 10000
