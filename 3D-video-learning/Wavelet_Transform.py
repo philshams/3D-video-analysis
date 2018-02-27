@@ -24,7 +24,7 @@ discard_scale = 4 #4 discards 4/5; 6 keeps all
 #%%
 
 num_frames = int(vid.get(cv2.CAP_PROP_FRAME_COUNT))
-wavelet_mouse = np.zeros((39,39,10)).astype(np.float16)
+wavelet_mouse = np.zeros((39,39,1500)).astype(np.float16)
 
 
 # for each frame (resize?) and perform wavelet decomposition
@@ -47,7 +47,7 @@ while True:
                 coeffs_lowpass[i] = [None,None,None]
 
         wavelet_recon = pywt.waverec2(coeffs_lowpass, wavelet='db1').astype(np.uint8)
-        cv2.imshow('wavelet reconstruction',wavelet_recon)
+        cv2.imshow('wavelet reconstruction2',wavelet_recon)
         
         coeff_array, coeff_slices = pywt.coeffs_to_array(coeffs[0:discard_scale])
 #        features = np.hstack([ib.ravel() for sublist in coeffs[0:discard_scale] for ib in sublist])
@@ -58,8 +58,11 @@ while True:
             print(str(frame_num) + ' out of ' + str(num_frames) + ' frames complete')        
         if cv2.waitKey(int(1000/frame_rate)) & 0xFF == ord('q'):
             break
-        if vid.get(cv2.CAP_PROP_POS_FRAMES) >= 10: #vid.get(cv2.CAP_PROP_FRAME_COUNT):
+        if vid.get(cv2.CAP_PROP_POS_FRAMES) >= 1500: #vid.get(cv2.CAP_PROP_FRAME_COUNT):
             break 
+        
+    else:
+        print('broken...')
         
 vid.release()
 np.save(file_loc + 'wavelet_mouse',wavelet_mouse)
