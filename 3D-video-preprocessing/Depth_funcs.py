@@ -3,6 +3,8 @@
 Created on Thu Feb  8 14:21:42 2018
 
 @author: SWC
+#%load_ext autoreload
+#%autoreload 2
 """
 
 import cv2
@@ -191,7 +193,37 @@ def get_biggest_contour(frame):
     cy = int(M['m01']/M['m00'])        
     
     return contours, big_cnt_ind, cx, cy, cnt
+
+def get_second_biggest_contour(frame, single_mouse_thresh, double_mouse_thresh):
+    _, contours, _ = cv2.findContours(frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE) 
+    cont_count = len(contours)
     
+    scd_big_cnt_ind = 0
+    big_cnt_ind = 0
+    if cont_count > 1:
+        areas = np.zeros(cont_count)
+        for c in range(cont_count):
+            areas[c] = cv2.contourArea(contours[c]) 
+        big_cnt_ind = np.argmax(areas)
+        biggest_area = areas[big_cnt_ind]
+        areas[big_cnt_ind] = 0
+        scd_big_cnt_ind = np.argmax(areas)
+        second_biggest_area = areas[scd_big_cnt_ind]
+        
+    if big_cnt_ind == scd_big_cnt_ind:
+        together = True
+    elif biggest_area < double_mouse_thresh and second_biggest_area > single_mouse_thresh:
+        together = False
+    else:
+        together = True
+    
+        
+    cnt2 = contours[scd_big_cnt_ind]
+    M = cv2.moments(cnt2)
+    cx2 = int(M['m10']/M['m00'])    
+    cy2 = int(M['m01']/M['m00'])        
+    
+    return scd_big_cnt_ind, cx2, cy2, cnt2, together   
     
 def flip_mouse(face_left, ellipse, topright_or_botleft, stereo_image_cropped_combined_gauss, sausage_thresh = 1.1):
     #get ellipse of mouse
@@ -221,7 +253,7 @@ def flip_mouse(face_left, ellipse, topright_or_botleft, stereo_image_cropped_com
 
 
 def correct_flip(initiation, face_left, stereo_top,stereo_bottom, depth_percentile, depth_ratio, history_x, history_y, cxL, cyL, ellipse, ellipse_width, \
-                 width_thresh=1.2, speed_thresh=40, depth_ratio_thresh = [.8, .7, .6], pixel_value_thresh = [109,89,69]):
+                 width_thresh=1.2, speed_thresh=12, depth_ratio_thresh = [.8, .7, .6], pixel_value_thresh = [109,89,69]):
     #calculate depth image stats
     major_top_avg = np.percentile(stereo_top[stereo_top>0], depth_percentile) 
     major_bottom_avg = np.percentile(stereo_bottom[stereo_bottom>0], depth_percentile) 
@@ -231,21 +263,26 @@ def correct_flip(initiation, face_left, stereo_top,stereo_bottom, depth_percenti
     
     x_tip = face_left*.5*ellipse[1][1]*np.cos(np.deg2rad(ellipse[2]+90))
     y_tip = face_left*.5*ellipse[1][1]*np.sin(np.deg2rad(ellipse[2]+90))
+     
+    flip = 0
     
     history_x[0:3] = history_x[1:4]
     history_y[0:3] = history_y[1:4]
     history_x[3] = cxL
     history_y[3] = cyL
     
-    delta_x = cxL - history_x[0]
-    delta_y = cyL - history_y[0]
-    speed = np.sqrt((delta_x)**2 + (delta_y)**2)
-#    heading = [(delta_x+.001) / (speed+.001), (delta_y+.001) / (speed+.001)]
+    delta_x = cxL - history_x[2] 
+    delta_y = -cyL + history_y[2]
+    prev_delta_x = history_x[2] - history_x[1] 
+    prev_delta_y = -history_y[2] + history_y[1]
+#    prev_prev_delta_x = history_y[1] - history_x[0] 
+#    prev_prev_delta_y = -history_y[1] + history_y[0]
     
     vec_length = np.sqrt(x_tip**2+y_tip**2)
-#    head_dir_putative = [x_tip/vec_length,-y_tip/vec_length]
-#    direction_dot = np.dot(heading,head_dir_putative)    
-    flip = 0
+    head_dir = [x_tip/vec_length,-y_tip/vec_length]
+    vel_along_head_dir = np.dot([delta_x,delta_y],head_dir)  
+    prev_vel_along_head_dir = np.dot([prev_delta_x,prev_delta_y],head_dir)  
+
 
 #    if ellipse_width > width_thresh and speed < speed_thresh and ( (np.all(depth_ratio < depth_ratio_thresh[0]) and major_bottom_avg > pixel_value_thresh[0]) \
 #                                               or (np.all(depth_ratio < depth_ratio_thresh[1]) and major_bottom_avg > pixel_value_thresh[1]) \
@@ -254,7 +291,6 @@ def correct_flip(initiation, face_left, stereo_top,stereo_bottom, depth_percenti
     if ellipse_width > width_thresh and ( (np.median(depth_ratio) < depth_ratio_thresh[0] and major_bottom_avg > pixel_value_thresh[0]) \
                                                or (np.median(depth_ratio) < depth_ratio_thresh[1] and major_bottom_avg > pixel_value_thresh[1]) \
                                                or (np.median(depth_ratio) < depth_ratio_thresh[2] and major_bottom_avg > pixel_value_thresh[2])):
-                                               #speed here 20 works
         face_left *= -1
         flip = 1
         print('face_HEIGHT_correction!')
@@ -263,12 +299,10 @@ def correct_flip(initiation, face_left, stereo_top,stereo_bottom, depth_percenti
             print('at low pixel value' + str(major_bottom_avg))
         print('')
 
-#    elif speed > speed_thresh and direction_dot < 0 and ellipse_width > width_thresh+.2  and initiation > 7: #speed here 50 works but always off
-#        face_left *= -1
-#        flip = 1
-#        print('face_SPEED_correction!')
-#        #print(history_x)
-#        print(speed)
+    elif vel_along_head_dir < -speed_thresh and prev_vel_along_head_dir < -speed_thresh and ellipse_width > width_thresh+.2  and initiation > 7: #speed here 50 works but always off
+        face_left *= -1
+        flip = 1
+        print('face_SPEED_correction!')
        
 
     if face_left == 1:
@@ -281,11 +315,48 @@ def correct_flip(initiation, face_left, stereo_top,stereo_bottom, depth_percenti
     
     return rotate_angle, face_left, depth_ratio, history_x, history_y, x_tip, y_tip, flip
 
+
+def write_videos(file_loc, write_images, do_not_overwrite, fourcc, frame_rate, width, height, crop_size, border_size,
+                 write_normal_video, write_normalized_video, write_cropped_mice, write_stereo_inputs, write_3D_combined, write_3D_smooth):
+        
+    normal_video, normalized_video, cropped_mouse, stereo_input_L, stereo_input_R, threeD_combined, threeD_smooth = np.zeros(7)
     
+    if write_images == True:
+        if write_normal_video == True:
+            video_file = file_loc + 'normal_video.avi'
+            if os.path.isfile(video_file) and do_not_overwrite:
+                raise Exception('File already exists') 
+            normal_video = cv2.VideoWriter(video_file,fourcc , frame_rate, (width,height))#, False) 
+        if write_normalized_video == True:
+            video_file = file_loc + 'normalized_video.avi'
+            if os.path.isfile(video_file) and do_not_overwrite:
+                raise Exception('File already exists')         
+            normalized_video = cv2.VideoWriter(video_file,fourcc , frame_rate, (width,height))#, False) 
+        if write_cropped_mice == True:
+            video_file = file_loc + 'cropped_mouse.avi'
+            if os.path.isfile(video_file) and do_not_overwrite:
+                raise Exception('File already exists')         
+            cropped_mouse = cv2.VideoWriter(video_file,fourcc , frame_rate, (3*crop_size,3*crop_size))#, False) 
+        if write_stereo_inputs == True:
+            video_fileL = file_loc + 'stereo_input_L.avi'
+            video_fileR = file_loc + 'stereo_input_R.avi'
+            if (os.path.isfile(video_fileL) or os.path.isfile(video_fileR)) and do_not_overwrite:
+                raise Exception('File already exists') 
+            stereo_input_L = cv2.VideoWriter(video_fileL,fourcc , frame_rate, (crop_size + 2*border_size,crop_size + border_size))#, False) 
+            stereo_input_R = cv2.VideoWriter(video_fileR,fourcc , frame_rate, (crop_size + 2*border_size,crop_size + border_size))#, False) 
+        if write_3D_combined == True:
+            video_file = file_loc + '3D_combined.avi'
+            if os.path.isfile(video_file) and do_not_overwrite:
+                raise Exception('File already exists')         
+            threeD_combined = cv2.VideoWriter(video_file,fourcc , frame_rate, (3*crop_size,3*crop_size))#, True) 
+        if write_3D_smooth == True:
+            video_file = file_loc + '3D_smooth.avi'
+            if os.path.isfile(video_file) and do_not_overwrite:
+                raise Exception('File already exists') 
+            threeD_smooth = cv2.VideoWriter(video_file,fourcc , frame_rate, (3*crop_size,3*crop_size))#, True)
     
-    
-    
-    
+    return normal_video, normalized_video, cropped_mouse, stereo_input_L, stereo_input_R, threeD_combined, threeD_smooth
+        
     
     
     

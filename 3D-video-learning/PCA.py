@@ -31,9 +31,9 @@ discard_scale = 4
 #%% load wavelet data
 
 #load wavelet-transformed arrays
-wavelet_transformed_array = np.load(file_loc + 'wavelet_mouse.npy')
+wavelet_transformed_array = np.load(file_loc + 'wavelet_mouse_3_5.npy')
 wavelet_transformed_array = np.reshape(wavelet_transformed_array,(39*39,wavelet_transformed_array.shape[2]))
-coeff_slices = np.load(file_loc + 'wavelet_slices_mouse.npy')
+coeff_slices = np.load(file_loc + 'wavelet_slices_mouse_3_5.npy')
 
 
 #only include non-zero features
@@ -76,7 +76,7 @@ if examine_PCs:
         print(str((100*pca.explained_variance_ratio_[n_com])) + '% var explained by this PC')
         print(str((100*sum(pca.explained_variance_ratio_[0:n_com+1]))) + '% var explained total')
         recon_error_wavelet = np.linalg.norm(wavelet_array_relevant_features - wavelet_array_relevant_features_recon,axis=1)
-        print('reconstruction error of ' + str(mean(recon_error_wavelet)))
+        print('reconstruction error of ' + str(np.mean(recon_error_wavelet)))
         print('')
         
         #build sample wavelet transform array
@@ -102,7 +102,7 @@ if examine_PCs:
 if save_PCs:
     #set PCA settings
     #e.g. 'full' vs 'randomized' vs 'arpack'; n_components can also be used to set percent variance explained (0-1)
-    pca = sklearn.decomposition.PCA(n_components=9, svd_solver = 'arpack') 
+    pca = sklearn.decomposition.PCA(n_components=12, svd_solver = 'arpack') 
     
     #Apply PCA to data library
     pca.fit(wavelet_array_relevant_features) #input is (samples, features)
@@ -110,7 +110,7 @@ if save_PCs:
     # Compute the expansion coefficients of the data to be analyzed, here using the same data as above
     pca_coeffs = pca.transform(wavelet_array_relevant_features) #input is (samples, features)
     
-    save_file = file_loc + 'PCA_coeffs_sampledata.npy'
+    save_file = file_loc + 'PCA_coeffs_sampledata_3_5.npy'
     if os.path.isfile(save_file) and do_not_overwrite:
         raise Exception('File already exists') 
     np.save(save_file, pca_coeffs)
