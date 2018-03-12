@@ -1,77 +1,128 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Feb 26 12:39:50 2018
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
-@author: SWC
-"""
+-----------                  Perform Wavelet Transform on 3D mouse video                             --------------------------------
+
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 import numpy as np
 import pywt
 import cv2
+import os
 
 
-#Receive data video
+
+
+#%% -------------------------------------------------------------------------------------------------------------------------------------
+#------------------------              Select data file and analysis parameters                 --------------------------------------
+#-----------------------------------------------------------------------------------------------------------------------------------------
+
+
+# ------------------------------------------
+# Select data file name and folder location
+# ------------------------------------------
 file_loc = 'C:\Drive\Video Analysis\data\\'
 date = '05.02.2018\\'
 mouse_session = '202-1a\\'
-file_loc = file_loc + date + mouse_session
+save_vid_name = 'analyze_7_3'
 
-save_vid_name = 'analyze_3_5'
-file_loc = file_loc + save_vid_name
 
-vid = cv2.VideoCapture(file_loc + '_data.avi')   
+file_loc = 'C:\Drive\Video Analysis\data\\'
+date = '14.02.2018_zina\\' #
+mouse_session = 'twomouse\\'  #
 
+save_vid_name = 'analyze'
+
+# load video ...
+file_loc = file_loc + date + mouse_session + save_vid_name
+
+# ---------------------------
+# Select analysis parameters
+# ---------------------------
 frame_rate = 1000
-stop_frame = 17000
+stop_frame = np.inf
+show_images = True
+save_data = False
+do_not_overwrite = True
+
 level = 5 # how many different spatial scales to use
-discard_scale = 4 #4 discards 4/5; 6 keeps all
+discard_scale = 4 # 4 discards 4/5; 6 keeps all
 
 
-#%%
 
+
+#%% -------------------------------------------------------------------------------------------------------------------------------------
+#-----------------------                            Do wavelet transform                       --------------------------------------
+#-----------------------------------------------------------------------------------------------------------------------------------------
+
+
+# ----------------------
+# Set up video playback
+# ----------------------
+vid = cv2.VideoCapture(file_loc + '_data.avi')
 num_frames = int(vid.get(cv2.CAP_PROP_FRAME_COUNT))
-wavelet_mouse = np.zeros((39,39,stop_frame)).astype(np.float16)
+stop_frame = int(np.min([stop_frame, num_frames]))
+wavelet_array = np.zeros((39,39,stop_frame)).astype(np.float16)
+   
 
-
-# for each frame (resize?) and perform wavelet decomposition
+# ---------------------------------------------
+# for each frame, perform wavelet decomposition
+# ---------------------------------------------
 while True:
     ret, frame = vid.read() # get the frame
 
     if ret: 
+        # ---------------------------------------------
+        # grab and, optionally, display each frame
+        # ---------------------------------------------
         frame_num = int(vid.get(cv2.CAP_PROP_POS_FRAMES))
         frame = frame[:,:,0]
-        #cv2.imshow('normal',frame)
+        frame = cv2.resize(frame,(150,150)) #resize...
+        if show_images:
+            cv2.imshow('normal image',frame)
         
-        #frame = np.ones((6,6))*[1,2,100,4,20,200]
+        # -----------------------------
+        # extract wavelet coefficients
+        # -----------------------------
         coeffs_lowpass = [[],[],[],[],[],[]]
         coeffs = pywt.wavedec2(frame, wavelet='db1',level = level)
-        
         for i in range(level+1):
+            #discard coefficients at too coarse of a spaital scale, as set by discard_scale
             if i < discard_scale:
                 coeffs_lowpass[i] = coeffs[i]
             else:
                 coeffs_lowpass[i] = [None,None,None]
-
         wavelet_recon = pywt.waverec2(coeffs_lowpass, wavelet='db1').astype(np.uint8)
-        #cv2.imshow('wavelet reconstruction2',wavelet_recon)
+        if show_images:
+            cv2.imshow('wavelet reconstruction',wavelet_recon)
         
+        #place coefficients in an array, and take coeff_slices index for later reconstruction       
         coeff_array, coeff_slices = pywt.coeffs_to_array(coeffs[0:discard_scale])
-#        features = np.hstack([ib.ravel() for sublist in coeffs[0:discard_scale] for ib in sublist])
-        wavelet_mouse[:,:,frame_num-1] = coeff_array
+        wavelet_array[:,:,frame_num-1] = coeff_array
         
         
+        # ----------------------------------------------------
+        # Stop video when finished and notify every 500 frames
+        # ----------------------------------------------------
         if (frame_num)%500==0:
             print(str(frame_num) + ' out of ' + str(num_frames) + ' frames complete')        
         if cv2.waitKey(int(1000/frame_rate)) & 0xFF == ord('q'):
             break
-        if vid.get(cv2.CAP_PROP_POS_FRAMES) >= stop_frame: #vid.get(cv2.CAP_PROP_FRAME_COUNT):
+        if vid.get(cv2.CAP_PROP_POS_FRAMES) >= stop_frame:
             break 
         
     else:
         print('broken...')
         
+# ----------
+# Save data
+# ----------
 vid.release()
-np.save(file_loc + 'wavelet_mouse_3_5',wavelet_mouse)
-np.save(file_loc + 'wavelet_slices_mouse_3_5',coeff_slices)
+if save_data:
+    save_file = file_loc + '_wavelet'
+    coeff_save_file = file_loc + '_wavelet_slices'
+    
+    if os.path.isfile(save_file) and do_not_overwrite:
+        raise Exception('File already exists')
+    np.save(save_file,wavelet_array)
+    np.save(coeff_save_file,coeff_slices)
 
-
-    #verify wavelet decomposition success with k dim

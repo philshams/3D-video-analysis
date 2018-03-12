@@ -323,34 +323,34 @@ def write_videos(file_loc, write_images, do_not_overwrite, fourcc, frame_rate, w
     
     if write_images == True:
         if write_normal_video == True:
-            video_file = file_loc + 'normal_video.avi'
+            video_file = file_loc + '_normal_video.avi'
             if os.path.isfile(video_file) and do_not_overwrite:
                 raise Exception('File already exists') 
             normal_video = cv2.VideoWriter(video_file,fourcc , frame_rate, (width,height))#, False) 
         if write_normalized_video == True:
-            video_file = file_loc + 'normalized_video.avi'
+            video_file = file_loc + '_normalized_video.avi'
             if os.path.isfile(video_file) and do_not_overwrite:
                 raise Exception('File already exists')         
             normalized_video = cv2.VideoWriter(video_file,fourcc , frame_rate, (width,height))#, False) 
         if write_cropped_mice == True:
-            video_file = file_loc + 'cropped_mouse.avi'
+            video_file = file_loc + '_cropped_mouse.avi'
             if os.path.isfile(video_file) and do_not_overwrite:
                 raise Exception('File already exists')         
             cropped_mouse = cv2.VideoWriter(video_file,fourcc , frame_rate, (3*crop_size,3*crop_size))#, False) 
         if write_stereo_inputs == True:
-            video_fileL = file_loc + 'stereo_input_L.avi'
-            video_fileR = file_loc + 'stereo_input_R.avi'
+            video_fileL = file_loc + '_stereo_input_L.avi'
+            video_fileR = file_loc + '_stereo_input_R.avi'
             if (os.path.isfile(video_fileL) or os.path.isfile(video_fileR)) and do_not_overwrite:
                 raise Exception('File already exists') 
             stereo_input_L = cv2.VideoWriter(video_fileL,fourcc , frame_rate, (crop_size + 2*border_size,crop_size + border_size))#, False) 
             stereo_input_R = cv2.VideoWriter(video_fileR,fourcc , frame_rate, (crop_size + 2*border_size,crop_size + border_size))#, False) 
         if write_3D_combined == True:
-            video_file = file_loc + '3D_combined.avi'
+            video_file = file_loc + '_3D_combined.avi'
             if os.path.isfile(video_file) and do_not_overwrite:
                 raise Exception('File already exists')         
             threeD_combined = cv2.VideoWriter(video_file,fourcc , frame_rate, (3*crop_size,3*crop_size))#, True) 
         if write_3D_smooth == True:
-            video_file = file_loc + '3D_smooth.avi'
+            video_file = file_loc + '_3D_smooth.avi'
             if os.path.isfile(video_file) and do_not_overwrite:
                 raise Exception('File already exists') 
             threeD_smooth = cv2.VideoWriter(video_file,fourcc , frame_rate, (3*crop_size,3*crop_size))#, True)

@@ -11,13 +11,9 @@ from Depth_funcs import flip_mouse, correct_flip
 # location of stereoscopic video data
 file_name = '3Dtest_secondmouse0.avi'
 file_loc = 'C:\Drive\Video Analysis\data\\'
-date = '14.02.2018_zina\\'
-mouse_session = 'twomouse\\' 
+date = '08.03.2018_zina\\' #'14.02.2018_zina\\'
+mouse_session = 'test3' #'twomouse\\' 
 
-#file_name = 'mouse0.avi'
-#file_loc = 'C:\Drive\Video Analysis\data\\'
-#date = '05.02.2018\\'
-#mouse_session = '202-1a\\'
 
 save_vid_name = 'test'
 
@@ -55,10 +51,10 @@ max_pixel_diff = 8
 final_smoothing_kernel_width = 17
 
 #directionality analysis
-depth_percentile = 60 #40?
+depth_percentile = 60 
 width_thresh= 1.2
-speed_thresh= np.inf
-depth_ratio_thresh = [.75, .68, .6] #.8, mean?
+speed_thresh= 12
+depth_ratio_thresh = [.75, .68, .6] 
 pixel_value_thresh = [109,89,69]
 
 #data options
@@ -95,13 +91,13 @@ else:
 
 # get or load 'background_mat_avg.npy' in data folder, for background subtraction
 if do_get_background:
-    background_mat = get_background_mean(file_name = file_name, file_loc = file_loc, avg_over_approx = 10000)
+    background_mat = get_background_mean(file_name = file_name, file_loc = file_loc, avg_over_approx = 100)
 else:
     background_file_name = file_loc + 'background_mat_avg.npy'
     background_mat = np.load(background_file_name)
 
 # get y-offset of cameras
-if do_get_background:
+if do_get_y_offset:
     y_offset = get_y_offset(file_name,background_mat,start_frame, stop_frame = 1000, l=1, r=2, mask_thresh = mask_thresh, kernel = kernel, iters = iters) #kernel and iters for erosion and dilation, respectively
     np.save(file_loc + 'y_offset.npy',y_offset)
 else:
