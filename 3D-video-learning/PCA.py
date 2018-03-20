@@ -5,14 +5,8 @@
 
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
-
-import numpy as np
-import cv2
-import sklearn.decomposition
-from learning_funcs import reconstruct_from_wavelet
-import os
-from sklearn.externals import joblib
-
+import numpy as np; import cv2; import sklearn.decomposition; import os; 
+from learning_funcs import reconstruct_from_wavelet; from sklearn.externals import joblib
 
 
 #%% -------------------------------------------------------------------------------------------------------------------------------------
@@ -26,14 +20,13 @@ from sklearn.externals import joblib
 file_loc = 'C:\Drive\Video Analysis\data\\'
 date = '05.02.2018\\'
 mouse_session = '202-1a\\'
-save_vid_name = 'analyze_7_3'
+save_vid_name = 'analyze_2D'
 
-file_name = '3Dtest_secondmouse0.avi' #
 file_loc = 'C:\Drive\Video Analysis\data\\'
-date = '14.02.2018_zina\\' #
-mouse_session = 'twomouse\\'  #
+date = '15.03.2018\\'
+mouse_session = 'bj141p2\\'
+save_vid_name = 'rectified_norm' # name-tag to be associated with all saved files
 
-save_vid_name = 'analyze'
 
 # ---------------------------
 # Select analysis parameters
@@ -41,11 +34,11 @@ save_vid_name = 'analyze'
 num_PCs_to_save = 12
 num_PCs_to_examine = 12
 
-save_PCs = False
+save_PCs = True
 examine_PCs = True
-cumulative_PCs = False
+cumulative_PCs = True
 do_not_overwrite = False
-display_frame_rate = 20
+display_frame_rate = 40
 
 # these must be parameters taken from original wavelet transform 
 level = 5

@@ -6,8 +6,8 @@
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
 import numpy as np; from matplotlib import pyplot as plt; from scipy import linalg
-from sklearn import mixture; from sklearn.model_selection import KFold; from hmmlearn import hmm
-from learning_funcs import cross_validate_GMM, add_velocity_as_feature, add_pose_change_as_feature, create_sequential_data
+from sklearn import mixture; from sklearn.model_selection import KFold; from hmmlearn import hmm; import warnings; warnings.filterwarnings('ignore')
+from learning_funcs import cross_validate_model, add_velocity_as_feature, add_pose_change_as_feature, create_sequential_data
 from learning_funcs import filter_features, calculate_and_save_model_output, set_up_PC_cluster_plot, create_legend
 
 
@@ -21,13 +21,16 @@ from learning_funcs import filter_features, calculate_and_save_model_output, set
 file_loc = 'C:\Drive\Video Analysis\data\\'
 date = '05.02.2018\\'
 mouse_session = '202-1a\\'
-save_vid_name = 'analyze_7_3'
+save_vid_name = 'analyze_2D'
+
+date = '28.02.2018\\'
+mouse_session = '205_2a\\'
+save_vid_name = 'analyze' # name-tag to be associated with all saved files
 
 file_loc = 'C:\Drive\Video Analysis\data\\'
-date = '14.02.2018_zina\\' 
-mouse_session = 'twomouse\\'  
-save_vid_name = 'analyze'
-
+date = '15.03.2018\\'
+mouse_session = 'bj141p2\\'
+save_vid_name = 'rectified_norm' # name-tag to be associated with all saved files
 
 file_loc = file_loc + date + mouse_session + save_vid_name
 
@@ -42,11 +45,12 @@ add_velocity = True #include velocity as a pseudo-PC
 vel_scaling_factor = 2 #scale down velocity's importance relative to PC1
 add_change = False #include that change in PC-space since last frame as a pseudo-PC (recommended only for trajectory)
 speed_only = True
+video_type = 'justone'
 
 # Trajectory Settings
-model_sequence = True
+model_sequence = False
 if model_sequence:
-    window_size = 2 #1 frames is 50 msec
+    window_size = 3 #frames
     windows_to_look_at = 3
 else:
     window_size, windows_to_look_at = 0,0
@@ -62,10 +66,9 @@ sigma = 2 #standard deviation in frames of gaussian filter
 # --------------------------------
 # Cross-Validation Settings
 cross_validation = False
-num_PCs_range = [6] # how many PCs are used
 K_range = [10] # K-fold cross-validation
 seed_range = [0] # random seed used
-num_clusters_range = [3,8] # range of how many clusters used in hmm
+num_clusters_range = [3,5] # range of how many clusters used in hmm
 tol = .001 # how low of an error needed to end model improvement
 
 # Misc Settings
@@ -84,8 +87,16 @@ do_not_overwrite = False
 # -------------------
 # Load relevant data
 # -------------------
-pca_coeffs = np.load(file_loc + '_pca_coeffs.npy')
 velocity = np.load(file_loc + '_velocity.npy')
+try:
+    disruptions = np.load(file_loc + '_disruption.npy')
+except:
+    disruptions = []
+if video_type == '2D':
+    file_loc = file_loc +'_2D'
+pca_coeffs = np.load(file_loc + '_pca_coeffs.npy')
+
+
 data_for_model = pca_coeffs[:,0:num_PCs_used]
 #modify saved file names depending on type of clustering:
 if model_sequence: 
@@ -100,14 +111,7 @@ else:
 if add_velocity:
     if add_change: #if using add_change, then apply speed_only
         speed_only = True
-    data_for_model = add_velocity_as_feature(data_for_model, speed_only, velocity, vel_scaling_factor)
-
-np.save(file_loc + '_' + model_type + '_settings' + suffix + '.npy',  #save settings
-        [add_velocity, speed_only, add_change, num_PCs_used, window_size, windows_to_look_at])
-
-
-
-
+    data_for_model = add_velocity_as_feature(data_for_model, speed_only, velocity, vel_scaling_factor,disruptions)
 
 # -------------------------------------
 # Smooth features going into the model
@@ -134,14 +138,23 @@ if model_sequence:  #add feature chunks preceding and following the frame in que
     data = data_for_model_sequence#use this for the model, if modeling sequence
 
 
+# -------------
+# Save settings
+# -------------  
+np.save(file_loc + '_' + model_type + '_settings' + suffix + '.npy',  #save settings
+        [add_velocity, speed_only, add_change, num_PCs_used, window_size, windows_to_look_at, np.max(data_for_model)])
+
+
+
 # --------------------
 # Do cross-validation
 # --------------------
 if cross_validation:
-    xval_scores = cross_validate_model(data, [probabilities.shape[1]], K_range, seed_range, num_clusters_range, tol)
-    #xval_scores gives: % in cluster w/ high confidence; 10th percentile of confidence; score; bayesian info content
+    xval_scores = cross_validate_model(data, model_type, K_range, seed_range, num_clusters_range, tol)
+    #xval_scores gives: % in cluster w/ high confidence; 10th percentile of confidence; score; bayesian info content (currently only for GMM)
  
     
+
 
 #%% -------------------------------------------------------------------------------------------------------------------------------------
 #------------------------              Generate Gaussian Mixture Model                            --------------------------------------
@@ -153,8 +166,8 @@ if cross_validation:
 # -------------------------
 if model_type == 'hmm':
     model = hmm.GaussianHMM(n_components=num_clusters, covariance_type="full",algorithm='viterbi',tol=.00001,random_state=seed)
-elif model == 'gmm':
-    model_type = mixture.GaussianMixture(n_components=num_clusters,tol=.00001,covariance_type='full',random_state=seed)
+elif model_type == 'gmm':
+    model = mixture.GaussianMixture(n_components=num_clusters,tol=.00001,covariance_type='full',random_state=seed)
     
     
 # ---------------------------
@@ -183,7 +196,7 @@ if plot_result:
     
     # set up plot
     plot_colors = ['red','deepskyblue','green','blueviolet','saddlebrown','lightpink','yellow','white']
-    set_up_PC_cluster_plot(figsize=(30,10), xlim=[1500,2500])
+    set_up_PC_cluster_plot(figsize=(30,10), xlim=[0,2000])
     
     # plot PCs
     data_for_model_normalized = data_for_model / np.max(data_for_model) #set max to 1 for visualization purposes

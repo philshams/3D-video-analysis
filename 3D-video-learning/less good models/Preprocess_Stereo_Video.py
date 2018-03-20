@@ -4,11 +4,9 @@
 
 
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-import numpy as np
-import cv2
-import os
-from Depth_funcs import create_global_matchers, get_background_mean, make_striped_background, get_y_offset, get_biggest_contour
-from Depth_funcs import flip_mouse, correct_flip, write_videos
+import numpy as np; import cv2; import os
+from depth_funcs import create_global_matchers, get_background_mean, make_striped_background, get_y_offset, get_biggest_contour
+from depth_funcs import flip_mouse, correct_flip, write_videos
 
 
 #%% -------------------------------------------------------------------------------------------------------------------------------------
@@ -24,7 +22,7 @@ file_name = 'mouse0.avi'
 file_loc = 'C:\Drive\Video Analysis\data\\'
 date = '05.02.2018\\'
 mouse_session = '202-1a\\'
-save_vid_name = 'analyze_7_3' # name-tag to be associated with all saved files
+save_vid_name = 'analyze_2D_test' # name-tag to be associated with all saved files
 
 # load video ...
 file_loc = file_loc + date + mouse_session
@@ -39,9 +37,9 @@ height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
 # Set video parameters
 # --------------------
 frame_rate = 20 #aesthetic frame rate of saved videos
-display_frame_rate = 1000 #1000 makes it as fast as possible
-start_frame = 1000
-end_frame = 19000 #set as either desired end frame or np.inf to go to end of movie
+display_frame_rate = 100 #1000 makes it as fast as possible
+start_frame = 0
+end_frame = np.inf #set as either desired end frame or np.inf to go to end of movie
 
 
 # ----------------------------
@@ -82,10 +80,12 @@ pixel_value_thresh = [109,89,69]
 # -----------------------
 # Set data-saving options
 # -----------------------
-show_images = False
+show_images = True
 save_data = True
-write_images = True
-do_not_overwrite = False
+write_images = False
+do_not_overwrite = True
+
+save_2D_data = True #saved cropeed video of mouse
 
 if write_images:
     write_normal_video = False
@@ -237,7 +237,9 @@ if save_data == True:
     data_file = file_loc + '_data.avi'
     if os.path.isfile(data_file) and do_not_overwrite:
         raise Exception('File already exists') 
-    data_video = cv2.VideoWriter(data_file,fourcc , frame_rate, (crop_size,crop_size), False) 
+    data_video_3D = cv2.VideoWriter(data_file,fourcc , frame_rate, (crop_size,crop_size), False) 
+    if save_2D_data:
+        data_video_2D = cv2.VideoWriter(file_loc + '_2D_data.avi',fourcc , frame_rate, (crop_size,crop_size), False) 
     data_times = np.array([])
     mouse_coordinates = []
     mouse_velocity = []
@@ -387,8 +389,12 @@ while True:
         if flip:
             print('frame ' + str(frame_num-start_frame))
         M = cv2.getRotationMatrix2D((int(crop_size/2),int(crop_size/2)),rotate_angle,1)
-        stereo_image_straight = cv2.warpAffine(stereo_image_smoothed,M,square_size)  
-        
+        stereo_image_straight = cv2.warpAffine(stereo_image_smoothed,M,square_size)
+        if save_2D_data_instead:
+            # get cropped mouse straight as well
+            frame_L_masked_cropped = cv2.warpAffine(frame_L_masked_cropped,M,square_size)
+            frame_R_masked_cropped = cv2.warpAffine(frame_R_masked_cropped,M,square_size)
+            
         # use center of mouse and orientation to get get mouse velocity relative to orientation
         delta_x = cxL - cxL_prev
         delta_y = - cyL + cyL_prev
@@ -406,15 +412,17 @@ while True:
         
         # save data for further analysis
         if save_data:
-            data_video.write(stereo_image_straight)  
+            if save_2D_data:
+                data_video_2D.write(frame_R_masked_cropped)
+            data_video_3D.write(stereo_image_straight)  
             data_times = np.append(data_times,frame_num-1-time_filter_width) #minus 1 to put in python coordinates
             mouse_coordinates.append([cxL,cyL])
             mouse_velocity.append([vel_along_head_dir,vel_ortho_head_dir,head_dir[0],head_dir[1]])
 
         # prepare frames for our vieweing pleasure
         if write_images or show_images:
-            frame_norm_R_resized = cv2.resize(frame_R_masked_cropped,(crop_size*3,crop_size*3))
-            frame_norm_L_resized = cv2.resize(frame_L_masked_cropped,(crop_size*3,crop_size*3))  
+            frame_R_masked_resized = cv2.resize(frame_R_masked_cropped,(crop_size*3,crop_size*3))
+            frame_L_masked_resized = cv2.resize(frame_L_masked_cropped,(crop_size*3,crop_size*3))  
 
             stereo_image_L_resized = cv2.resize(stereo_image_L_cropped,(crop_size*3,crop_size*3)) 
             stereo_image_R_resized = cv2.resize(stereo_image_R_cropped,(crop_size*3,crop_size*3))    
@@ -440,7 +448,7 @@ while True:
                 normalized_video.write(frame_norm_R)
             if write_cropped_mice:
                 frame_norm_R_resized = cv2.cvtColor(frame_norm_R_resized, cv2.COLOR_GRAY2RGB)
-                cropped_mouse.write(frame_norm_R_resized)
+                cropped_mouse.write(frame_R_masked_resized)
             if write_stereo_inputs:
                 frame_L_masked_striped = cv2.cvtColor(frame_L_masked_striped, cv2.COLOR_GRAY2RGB)
                 stereo_input_L.write(frame_L_masked_striped)
@@ -458,8 +466,8 @@ while True:
 #            cv2.imshow('maskcheckR',frame_R_masked_striped)
 #            cv2.imshow('2D', frame[:,:,r])
             cv2.imshow('2D_norm', frame_norm_R)
-            cv2.imshow('2D_norm_croppedR', frame_norm_R_resized)
-#            cv2.imshow('2D_norm_croppedL', frame_norm_L_resized) 
+            cv2.imshow('2D_norm_croppedR', frame_R_masked_resized)
+#            cv2.imshow('2D_norm_croppedL', frame_L_masked_resized) 
 #            cv2.imshow('3D left', stereo_image_L_resized) 
 #            cv2.imshow('3D right', stereo_image_R_resized) 
 #            cv2.imshow('3D combined', stereo_image_combined_resized)    
@@ -490,7 +498,9 @@ while True:
 
 # save position, velocity, and frame numbers
 if save_data:
-    data_video.release()
+    data_video_3D.release()
+    if save_2D_data:
+        data_video_2D.release()
     np.save(file_loc + '_coordinates.npy', mouse_coordinates)
     np.save(file_loc + '_velocity.npy', mouse_velocity)
     np.save(file_loc + '_frames', data_times)

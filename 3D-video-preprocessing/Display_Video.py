@@ -11,12 +11,14 @@ import cv2
 # ------------------------------------------
 # Select video file name and folder location
 # ------------------------------------------
-file_name = '3Dtest_secondmouse0.avi' #
+file_name = 'ay117b_test1.avi' #
 file_loc = 'C:\Drive\Video Analysis\data\\'
-date = '14.02.2018_zina\\' #
-mouse_session = 'twomouse\\'  #
+date = '14.03.2018_zina\\' #
+mouse_session = 'test_video\\'  #
 
 file_loc = file_loc + date + mouse_session
+
+time = np.load(file_loc + 'ay117b_test1_timestamps.npy')
 print(file_loc)
 
 display_frame_rate = 20
@@ -38,6 +40,7 @@ while True:
         cv2.imshow('movie',frame)
         
         frame_num = vid.get(cv2.CAP_PROP_POS_FRAMES)
+        print(frame_num)
 
         if cv2.waitKey(int(1000/display_frame_rate)) & 0xFF == ord('q'):
             break
@@ -49,6 +52,7 @@ while True:
             break 
     else:
         print('Problem with movie playback')
+        cv2.waitKey(1000)
         
 vid.release()
 # Display number of last frame

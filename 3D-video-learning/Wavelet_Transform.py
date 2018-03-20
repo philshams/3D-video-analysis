@@ -4,12 +4,7 @@
 
 
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-import numpy as np
-import pywt
-import cv2
-import os
-
-
+import numpy as np; import pywt; import cv2; import os
 
 
 #%% -------------------------------------------------------------------------------------------------------------------------------------
@@ -23,14 +18,17 @@ import os
 file_loc = 'C:\Drive\Video Analysis\data\\'
 date = '05.02.2018\\'
 mouse_session = '202-1a\\'
-save_vid_name = 'analyze_7_3'
+save_vid_name = 'analyze_2D'
 
+date = '28.02.2018\\'
+mouse_session = '205_2a\\'
+save_vid_name = 'analyze' # name-tag to be associated with all saved files
 
 file_loc = 'C:\Drive\Video Analysis\data\\'
-date = '14.02.2018_zina\\' #
-mouse_session = 'twomouse\\'  #
+date = '15.03.2018\\'
+mouse_session = 'bj141p2\\'
+save_vid_name = 'rectified_norm' # name-tag to be associated with all saved files
 
-save_vid_name = 'analyze'
 
 # load video ...
 file_loc = file_loc + date + mouse_session + save_vid_name
@@ -41,7 +39,7 @@ file_loc = file_loc + date + mouse_session + save_vid_name
 frame_rate = 1000
 stop_frame = np.inf
 show_images = True
-save_data = False
+save_data = True
 do_not_overwrite = True
 
 level = 5 # how many different spatial scales to use
