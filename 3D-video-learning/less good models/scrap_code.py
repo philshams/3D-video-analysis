@@ -10,7 +10,28 @@
 #%% -------------------------------------------------------------------------------------------------------------------------------------
 #------------------------                       Pre-process scrap                 --------------------------------------
 #-----------------------------------------------------------------------------------------------------------------------------------------
-        # ----------------------
+ 
+#time audit
+
+#t0 = time.time() #get time
+#        t_frame = time.time()
+#        print('')
+#            t_normalize = time.time()
+#            print('time to normalize: ' + str(int(1000*(t_normalize-t_frame))))
+#            t_undistort = time.time()
+#            print('time to undistort norm: ' + str(int(1000*(t_undistort-t_normalize))))
+#            t_dilate = time.time()
+#            print('time to dilate: ' + str(int(1000*(t_dilate-t_undistort))))
+#            t_contour = time.time()
+#            print('time to extract contours and check for obscurity: ' + str(int(1000*(t_contour - t_dilate))))
+#            t_mask1 = time.time()
+#            print('time to make mask: ' + str(int(1000*(t_mask1- t_contour))))
+#            t_mask2 = time.time()
+#            print('time to apply mask: ' + str(int(1000*(t_mask2- t_mask1))))
+#            t_mask3 = time.time()
+#            print('time to crop: ' + str(int(1000*(t_mask3- t_mask2))))
+
+       # ----------------------
         # Get mouse orientation from head being higher
         # ----------------------
         

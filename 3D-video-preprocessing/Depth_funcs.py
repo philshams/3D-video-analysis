@@ -34,7 +34,7 @@ def create_global_matchers(window_size = 1, min_disparity = 64, num_disparities 
 
     
 #%% ----------------------------------------------------------------------------------------------------------------------------------
-def get_background_mean(vid, vid2, two_videos, stereo, file_loc = '', avg_over = 100):
+def get_background_mean(vid, vid2, two_videos, stereo, start_frame = 0, file_loc = '', avg_over = 100):
     save_file = file_loc + 'background_mat_avg.npy'
     if os.path.isfile(save_file):
         raise Exception('File already exists') 
@@ -44,7 +44,7 @@ def get_background_mean(vid, vid2, two_videos, stereo, file_loc = '', avg_over =
     height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))    
     background_mat = np.zeros((height, width, 2 ))
     num_frames = vid.get(cv2.CAP_PROP_FRAME_COUNT)
-    vid.set(cv2.CAP_PROP_POS_FRAMES, 0)
+    vid.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
     
     every_other = int(num_frames / avg_over)
     
@@ -78,10 +78,10 @@ def get_background_mean(vid, vid2, two_videos, stereo, file_loc = '', avg_over =
                 
                 if avg_over > 200:
                     if j%100 == 0:
-                        print(str(j) + ' frames out of ' + str(avg_over_approx) + ' done')
+                        print(str(j) + ' frames out of ' + str(avg_over) + ' done')
                 else:
                     if j%10 == 0:
-                        print(str(j) + ' frames out of ' + str(avg_over_approx) + ' done')
+                        print(str(j) + ' frames out of ' + str(avg_over) + ' done')
 
 
         if vid.get(cv2.CAP_PROP_POS_FRAMES)+1 == vid.get(cv2.CAP_PROP_FRAME_COUNT):
@@ -319,17 +319,17 @@ def correct_flip(video_type, initiation, face_left, image_top, image_bottom, his
     if vel_along_head_dir < -speed_thresh and prev_vel_along_head_dir < -speed_thresh and ellipse_width > width_thresh+.2  and initiation > 7: 
         face_left *= -1
         flip = 1
-        print('face_SPEED_correction!')
-        print(vel_along_head_dir)
+        print('speed-based orientation correction!')
+        print('speed of ' + str(int(vel_along_head_dir)))
     
     else:
         depth_ratio = np.sum(image_top) / np.sum(image_bottom)
         if ellipse_width > width_thresh and depth_ratio > wispy_thresh:
             face_left *= -1
             flip = 1
-            print('face_WISPINESS_correction!')
-            print(depth_ratio)
-            print(ellipse_width)
+            print('face-girth-vs-butt-girth-based orientation correction!')
+            print('girth ratio of ' + str(depth_ratio))
+            print('ellipse ratio of ' + str(ellipse_width))
             
 
     if face_left == 1:

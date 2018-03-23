@@ -35,9 +35,14 @@ def reconstruct_from_wavelet(wavelet_array,coeff_slices, level, discard_scale):
 
 
 #%% ----------------------------------------------------------------------------------------------------------------------------------
-def add_velocity_as_feature(data_for_model, speed_only, velocity, vel_scaling_factor, disruptions):
+def add_velocity_as_feature(data_for_model, speed_only, add_turn, velocity, vel_scaling_factor, disruptions):
     
     velocity[disruptions==1,0:2] = 0
+    #find 6 stdev, throw out those beyond that as spurious
+    mean_vel = np.mean(velocity[:,0:2],axis=0)
+    std_vel = np.std(velocity[:,0:2],axis=0)
+    velocity[abs(velocity[:,0]-mean_vel[0]) > 6*std_vel[0],0:2] = 0
+    velocity[abs(velocity[:,1]-mean_vel[1]) > 6*std_vel[1],0:2] = 0
     
     max_vel = np.max(abs(velocity[:,0:2]))
     max_pc = np.max(data_for_model)
@@ -47,7 +52,7 @@ def add_velocity_as_feature(data_for_model, speed_only, velocity, vel_scaling_fa
         velocity_for_model[:,:] = velocity[:,0:2] / max_vel * max_pc / vel_scaling_factor
         velocity_for_model[:,1] = np.abs(velocity_for_model[:,1]) - np.mean(np.abs(velocity_for_model[:,1]))  #zero-center data
         velocity_for_model[disruptions==1,:] = 0
-        
+                
     if speed_only: #just get velocity magnitude (speed)
         speed_for_model = np.zeros((data_for_model.shape[0],1))
         speed_for_model[:,0] = np.nan_to_num(np.sqrt(velocity[:,0]**2 + velocity[:,1]**1))
@@ -58,6 +63,23 @@ def add_velocity_as_feature(data_for_model, speed_only, velocity, vel_scaling_fa
         max_speed = np.max(abs(velocity_for_model))
         velocity_for_model = velocity_for_model / max_speed * max_pc / vel_scaling_factor
         velocity_for_model[disruptions==1,:] = 0
+        
+    if add_turn and speed_only:
+        velocity_and_turn_for_model = np.zeros((data_for_model.shape[0],2))
+        velocity_and_turn_for_model[:,0] = np.squeeze(velocity_for_model)
+        
+        last_head_direction = velocity[:-1,2:4]
+        next_head_direction = velocity[1:,2:4]
+        head_turn = np.nan_to_num(np.arccos(np.sum(last_head_direction * next_head_direction, axis=1)))
+        head_turn[head_turn > np.pi/2] = 0 #spurious
+        head_turn[head_turn > np.pi/12] = np.pi/12 #somewhat spurious
+        head_turn = head_turn / (np.pi/12) * max_pc / vel_scaling_factor
+        
+        velocity_and_turn_for_model[:-1,1] = head_turn
+        velocity_for_model = velocity_and_turn_for_model
+        
+    if add_turn and not speed_only:
+        print('please turn off either add_turn or speed_only')
 
     #append the appropriate velocity array to PCs    
     data_for_model = np.append(data_for_model,velocity_for_model,axis=1)
@@ -114,10 +136,6 @@ def create_sequential_data(data_for_model, window_size, windows_to_look_at):
 
 #%% ----------------------------------------------------------------------------------------------------------------------------------
 def calculate_and_save_model_output(data, model, num_clusters, file_loc, model_type, suffix, do_not_overwrite):
-    save_file_model = file_loc + '_' + model_type + suffix #save model
-    if os.path.isfile(save_file_model) and do_not_overwrite:
-        raise Exception('File already exists') 
-    joblib.dump(model, save_file_model)
     
     #get probabilities of being in each cluster at each frame
     probabilities = model.predict_proba(data)
@@ -146,7 +164,7 @@ def calculate_and_save_model_output(data, model, num_clusters, file_loc, model_t
 
 
 #%% ----------------------------------------------------------------------------------------------------------------------------------
-def create_legend(num_PCs_shown, add_velocity, speed_only, add_change):
+def create_legend(num_PCs_shown, add_velocity, speed_only, add_change, add_turn):
     legend_entries = []
     for pc in range(num_PCs_shown):
         legend_entries.append('PC' + str(pc+1))
@@ -156,6 +174,8 @@ def create_legend(num_PCs_shown, add_velocity, speed_only, add_change):
             legend_entries.append('turn speed')
     if add_change:
         legend_entries.append('change in pose')
+    if add_turn:
+        legend_entries.append('turn angle')
     legend = plt.legend((legend_entries))
     return legend_entries
 

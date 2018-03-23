@@ -18,21 +18,20 @@ from learning_funcs import filter_features, calculate_and_save_model_output, set
 # ------------------------------------------
 # Select data file name and folder location
 # ------------------------------------------
+# Data for model generation
 file_loc = 'C:\Drive\Video Analysis\data\\'
-date = '05.02.2018\\'
-mouse_session = '202-1a\\'
-save_vid_name = 'analyze_2D'
+date = 'baseline_analysis\\'
+mouse_session = 'together_for_model\\'
+save_vid_name = 'all'
+model_file_loc = file_loc + date + mouse_session + save_vid_name
 
-date = '28.02.2018\\'
-mouse_session = '205_2a\\'
-save_vid_name = 'analyze' # name-tag to be associated with all saved files
+# Data to visualize fit
+file_loc = 'C:\Drive\Video Analysis\data\\baseline_analysis\\'
+date = '27.02.2018\\'
+mouse_session = '205_1a\\'
+save_vid_name = 'normal_1_0'
+fit_file_loc = file_loc + date + mouse_session + save_vid_name
 
-file_loc = 'C:\Drive\Video Analysis\data\\'
-date = '15.03.2018\\'
-mouse_session = 'bj141p2\\'
-save_vid_name = 'rectified_norm' # name-tag to be associated with all saved files
-
-file_loc = file_loc + date + mouse_session + save_vid_name
 
 # ---------------------------
 # Select analysis parameters
@@ -42,16 +41,16 @@ model_type = 'hmm' #hmm or gmm
 num_clusters = 4 #number of poses
 num_PCs_used = 4 #number of PCs used as features
 add_velocity = True #include velocity as a pseudo-PC
-vel_scaling_factor = 2 #scale down velocity's importance relative to PC1
-add_change = False #include that change in PC-space since last frame as a pseudo-PC (recommended only for trajectory)
-speed_only = True
-video_type = 'justone'
+
+vel_scaling_factor = 1 #scale down velocity's importance relative to PC1
+add_turn = True
+
 
 # Trajectory Settings
 model_sequence = False
 if model_sequence:
-    window_size = 3 #frames
-    windows_to_look_at = 3
+    window_size = 4 #frames
+    windows_to_look_at = 2
 else:
     window_size, windows_to_look_at = 0,0
 
@@ -87,14 +86,15 @@ do_not_overwrite = False
 # -------------------
 # Load relevant data
 # -------------------
-velocity = np.load(file_loc + '_velocity.npy')
+velocity = np.load(model_file_loc + '_velocity.npy')
+speed_only = True #recommended
+add_change = False #not recommended
 try:
-    disruptions = np.load(file_loc + '_disruption.npy')
+    disruptions = np.load(model_file_loc + '_disruption.npy')
 except:
     disruptions = []
-if video_type == '2D':
-    file_loc = file_loc +'_2D'
-pca_coeffs = np.load(file_loc + '_pca_coeffs.npy')
+
+pca_coeffs = np.load(model_file_loc + '_pca_coeffs.npy')
 
 
 data_for_model = pca_coeffs[:,0:num_PCs_used]
@@ -111,7 +111,7 @@ else:
 if add_velocity:
     if add_change: #if using add_change, then apply speed_only
         speed_only = True
-    data_for_model = add_velocity_as_feature(data_for_model, speed_only, velocity, vel_scaling_factor,disruptions)
+    data_for_model = add_velocity_as_feature(data_for_model, speed_only, add_turn, velocity, vel_scaling_factor,disruptions)
 
 # -------------------------------------
 # Smooth features going into the model
@@ -141,8 +141,8 @@ if model_sequence:  #add feature chunks preceding and following the frame in que
 # -------------
 # Save settings
 # -------------  
-np.save(file_loc + '_' + model_type + '_settings' + suffix + '.npy',  #save settings
-        [add_velocity, speed_only, add_change, num_PCs_used, window_size, windows_to_look_at, np.max(data_for_model)])
+np.save(model_file_loc + '_' + model_type + '_settings' + suffix + '.npy',  #save settings
+        [add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at, np.max(data_for_model)])
 
 
 
@@ -173,13 +173,13 @@ elif model_type == 'gmm':
 # ---------------------------
 # Fit and save mixture model
 # ---------------------------
+print('fitting model...')
 model.fit(data)   #fit model
+save_file_model = model_file_loc + '_' + model_type + suffix #save model
+if os.path.isfile(save_file_model) and do_not_overwrite:
+    raise Exception('File already exists') 
+joblib.dump(model, save_file_model)
 
-
-# -------------------------------
-# Calculate and save model output
-# -------------------------------
-calculate_and_save_model_output(data, model, num_clusters, file_loc, model_type, suffix, do_not_overwrite)
 
 
 
@@ -188,11 +188,17 @@ calculate_and_save_model_output(data, model, num_clusters, file_loc, model_type,
 #-----------------------------------------------------------------------------------------------------------------------------------------
 
 if plot_result:
+    # -------------------------------
+    # Calculate and save model output
+    # -------------------------------
+    calculate_and_save_model_output(data, model, num_clusters, fit_file_loc, model_type, suffix, do_not_overwrite)
+    
+    
     plt.close('all')
     #reload relevant data
-    components_binary = np.load(file_loc + '_components_binary' + suffix + '.npy')
-    unchosen_components_binary = np.load(file_loc + '_unchosen_components_binary' + suffix + '.npy')
-    unchosen_probabilities = np.load(file_loc + '_unchosen_probabilities' + suffix + '.npy')
+    components_binary = np.load(fit_file_loc + '_components_binary' + suffix + '.npy')
+    unchosen_components_binary = np.load(fit_file_loc + '_unchosen_components_binary' + suffix + '.npy')
+    unchosen_probabilities = np.load(fit_file_loc + '_unchosen_probabilities' + suffix + '.npy')
     
     # set up plot
     plot_colors = ['red','deepskyblue','green','blueviolet','saddlebrown','lightpink','yellow','white']
@@ -200,13 +206,13 @@ if plot_result:
     
     # plot PCs
     data_for_model_normalized = data_for_model / np.max(data_for_model) #set max to 1 for visualization purposes
-    np.save(file_loc+'_data_for_' + model_type + '_normalized', data_for_model_normalized)
+    np.save(fit_file_loc+'_data_for_' + model_type + '_normalized', data_for_model_normalized)
     plt.plot(data_for_model_normalized[:,0:num_PCs_shown])
     
     # plot velocity and/or pose change
     if add_velocity:
-        plt.plot(data_for_model_normalized[:,-2-add_change+speed_only], color = 'k',linewidth=2) #plot speed
-        if not(speed_only) or add_change: #plot turn speed or, if available, pose change
+        plt.plot(data_for_model_normalized[:,-2-add_change+speed_only-add_turn], color = 'k',linewidth=2) #plot speed
+        if not(speed_only) or add_change or add_turn: #plot turn speed or, if available, pose change
             plt.plot(data_for_model_normalized[:,-1], color = 'gray', linestyle = '--',linewidth=2)
       
     # plot raster of clusters above PCs
@@ -219,6 +225,6 @@ if plot_result:
         plt.scatter(unchosen_component_frames,np.ones(len(unchosen_component_frames))*.95,color=plot_colors[n],alpha=.4,marker='|',s=700)
     
     # Create legend
-    legend_entries = create_legend(num_PCs_shown, add_velocity, speed_only, add_change)
+    legend_entries = create_legend(num_PCs_shown, add_velocity, speed_only, add_change, add_turn)
     
 

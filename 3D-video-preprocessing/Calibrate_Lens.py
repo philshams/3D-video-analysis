@@ -4,27 +4,41 @@
 
 
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-
 import numpy as np; import os; import glob; import cv2
 
 
-# Find calibration images
+#%% -------------------------------------------------------------------------------------------------------------------------------------
+#------------------------                         Get Lens Parameters                   --------------------------------------
+#-----------------------------------------------------------------------------------------------------------------------------------------
+
+# ------------------------------------------
+# Select calibration images folder location
+# ------------------------------------------
 file_loc = 'C:\Drive\Video Analysis\data\\'
 date = ''
 mouse_session = 'calibration_images\\'
-camera_name = 'all\\' # name-tag to be associated with all saved files
-camera = 'all2'
+camera_name = 'all\\'
 
 file_loc = file_loc + date + mouse_session + camera_name
 
-# Do calibration
-CHECKERBOARD = (28,12)
+#name prepended to the saved rectification maps
+camera = 'show'
+
+
+#Set parameters
+CHECKERBOARD = (28,12) #size of the checkerboard (# of vertices in each dimension, not including those on the edge)
+
+#Go through and set pixels below the light_threshold to white and pixels above the dark_threshold to black
 light_threshold = [65, 60, 55, 52, 47, 45, 42, 40, 37, 35, 32, 30, 28, 27, 25]
 dark_threshold =  [30, 30, 30, 30, 30, 25, 25, 25, 20, 20, 15, 15, 15, 15, 15]
 
 
 
+# -------------------------
+# Find checkerboard corners
+# -------------------------
 
+#Find checkerboard corners -- set up for .pngs
 CHECKERFLIP = tuple(np.flip(CHECKERBOARD,0))
 subpix_criteria = (cv2.TERM_CRITERIA_EPS+cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
 calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC+cv2.fisheye.CALIB_FIX_SKEW #+cv2.fisheye.CALIB_CHECK_COND
@@ -72,7 +86,9 @@ for fname in images:
         
         
         
-        
+# -----------------------------------------------------------------
+# Use checkerboard corners to get the calibration matrices K and D
+# -----------------------------------------------------------------
 N_OK = len(objpoints)
 K = np.zeros((3, 3))
 D = np.zeros((4, 1))
@@ -95,8 +111,13 @@ print("DIM=" + str(_img_shape[::-1]))
 print("K=np.array(" + str(K.tolist()) + ")")
 print("D=np.array(" + str(D.tolist()) + ")")
 
-#%% test calibration
 
+
+#%% -------------------------------------------------------------------------------------------------------------------------------------
+#------------------------                Test Calibration and Save Remappings                       --------------------------------------
+#-----------------------------------------------------------------------------------------------------------------------------------------
+
+# Display recalibrated images
 DIM=_img_shape[::-1]
 K=np.array(K)
 D=np.array(D)
@@ -107,25 +128,29 @@ for img_path in glob.glob(file_loc + '*.png'):
     undistorted_img = cv2.remap(img, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
     cv2.imshow("correction", img)
     cv2.waitKey(2500)
-#    cv2.imshow("correction", undistorted_img)
-#    cv2.waitKey(2500)
     
     dim1 = img.shape[:2][::-1]  #dim1 is the dimension of input image to un-distort
     assert dim1[0]/dim1[1] == DIM[0]/DIM[1], "Image to undistort needs to have same aspect ratio as the ones used in calibration"
-    dim2 = dim1
-    dim3 = dim2
+    dim2 = dim1 #dim2 is the dimension of remapped image
+    dim3 = dim2 #dim3 is the dimension of final output image
     
-    # This is how scaled_K, dim2 and balance are used to determine the final K used to un-distort image. OpenCV document failed to make this clear!
+    # K, dim2 and balance are used to determine the final K used to un-distort image -- balance = 1 retains all pixels
     new_K = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(K, D, dim2, np.eye(3), balance=1)
     map1, map2 = cv2.fisheye.initUndistortRectifyMap(K, D, np.eye(3), new_K, dim3, cv2.CV_16SC2)
     undistorted_img = cv2.remap(img, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
     cv2.imshow('correction', undistorted_img)
     if cv2.waitKey(2500) & 0xFF == ord('q'):
        break 
+   
+# save maps to use in analysis!
+# to be used like: undistorted_img = cv2.remap(img, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)       
 maps = np.zeros((calib_image.shape[0],calib_image.shape[1],3)).astype(int16)
 maps[:,:,0:2] = map1
 maps[:,:,2] = map2
 np.save(file_loc + 'fisheye_maps_' + camera + '.npy', maps)
+
+
+
 
 
         

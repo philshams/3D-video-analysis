@@ -17,39 +17,40 @@ from learning_funcs import set_up_PC_cluster_plot, create_legend
 # ------------------------------------------
 # Select data file name and folder location
 # ------------------------------------------
+# Select model directory
 file_loc = 'C:\Drive\Video Analysis\data\\'
-date = '05.02.2018\\'
-mouse_session = '202-1a\\'
-save_vid_name = 'analyze_2D'
+date = 'baseline_analysis\\'
+mouse_session = 'together_for_model\\'
+save_vid_name = 'all'
 
-date = '28.02.2018\\'
-mouse_session = '205_2a\\'
-save_vid_name = 'analyze' # name-tag to be associated with all saved files
+model_file_loc = file_loc + date + mouse_session + save_vid_name
 
-file_loc = 'C:\Drive\Video Analysis\data\\'
-date = '15.03.2018\\'
-mouse_session = 'bj141p2\\'
-save_vid_name = 'rectified_norm' # name-tag to be associated with all saved files
+# Select session directory
+file_loc = 'C:\Drive\Video Analysis\data\\baseline_analysis\\'
+date = '27.02.2018\\'
+mouse_session = '205_1a\\'
+file_name = 'Chronic_Mantis_stim-default-996386-video-0.avi'
+save_vid_name = 'normal_1_0'
 
-movie_file_loc = file_loc + date + mouse_session + 'rectified_normalized_video.avi'
-file_loc = file_loc + date + mouse_session + save_vid_name
+movie_file_loc = file_loc + date + mouse_session + file_name
+data_file_loc = file_loc + date + mouse_session + save_vid_name
 
 # --------------------------------
 # Select visualization parameters 
 # --------------------------------
 model_type = 'hmm'
-model_sequence = False
+model_sequence = True
 
 frame_rate = 1000
-start_frame = 10
-stop_frame = 30000
+start_frame = 4400
+stop_frame = 40000
 
 trajectory_pose_size = 400
 show_unchosen_cluster = .15 #threshold to show 2nd-choice cluster
 num_PCs_shown = 3
-show_clusters = True
-show_clusters_all_at_once = True
-
+show_clusters = False
+show_clusters_all_at_once = False
+show_shelter = True
 
 
 #%% -------------------------------------------------------------------------------------------------------------------------------------
@@ -57,42 +58,49 @@ show_clusters_all_at_once = True
 #-----------------------------------------------------------------------------------------------------------------------------------------
 
 #load videos
-depth_vid = cv2.VideoCapture(file_loc + '_data.avi')   
-#mouse_vid = cv2.VideoCapture(file_loc + '_normalized_video.avi') 
+depth_vid = cv2.VideoCapture(data_file_loc + '_data.avi')   
 mouse_vid = cv2.VideoCapture(movie_file_loc)  
 
-#load data
-data_for_model_normalized = np.load(file_loc+'_data_for_' + model_type + '_normalized.npy')
-chosen_components = np.load(file_loc+'_chosen_components.npy')
-components_binary = np.load(file_loc+'_components_binary.npy')
-unchosen_components_binary = np.load(file_loc+'_unchosen_components_binary.npy')
-probabilities = np.load(file_loc+'_probabilities.npy')
-unchosen_probabilities = np.load(file_loc+'_unchosen_probabilities.npy')
 
-add_velocity, speed_only, add_change, num_PCs_used, window_size, windows_to_look_at, feature_max = np.load(file_loc + '_' + model_type + '_settings.npy')
-add_velocity, speed_only, add_change, num_PCs_used, window_size, windows_to_look_at = np.array([add_velocity, speed_only, add_change, num_PCs_used, window_size, windows_to_look_at]).astype(int)
+#load data
+data_for_model_normalized = np.load(data_file_loc+'_data_for_' + model_type + '_normalized.npy')
+chosen_components = np.load(data_file_loc+'_chosen_components.npy')
+components_binary = np.load(data_file_loc+'_components_binary.npy')
+unchosen_components_binary = np.load(data_file_loc+'_unchosen_components_binary.npy')
+probabilities = np.load(data_file_loc+'_probabilities.npy')
+unchosen_probabilities = np.load(data_file_loc+'_unchosen_probabilities.npy')
+
+add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at, feature_max = np.load(model_file_loc + '_' + model_type + '_settings.npy')
+add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at = np.array([add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at]).astype(int)
 num_clusters = probabilities.shape[1] #load model settings
 
-pca = joblib.load(file_loc + '_pca') #load transform info for reconstruction
-relevant_ind = np.load(file_loc + '_wavelet_relevant_ind.npy')
-coeff_slices = np.load(file_loc + '_wavelet_slices.npy')
+pca = joblib.load(model_file_loc + '_pca') #load transform info for reconstruction
+relevant_ind = np.load(model_file_loc + '_wavelet_relevant_ind.npy')
+coeff_slices = np.load(model_file_loc + '_wavelet_slices.npy')
 level = 5 # these must be parameters taken from original wavelet transform 
 discard_scale = 4
 
-model = joblib.load(file_loc + '_' + model_type) #load model
+out_of_bounds = np.load(data_file_loc + '_out_of_bounds.npy')
+frames = np.load(data_file_loc + '_frames.npy')
+
+if show_shelter:
+    shelter = cv2.imread('C:\\Drive\\Video Analysis\\data\\calibration_images\\shelter\\shelter.png')
+    shelter = cv2.resize(shelter,(450,450))
+    
+model = joblib.load(model_file_loc + '_' + model_type) #load model
 
 if model_sequence: #rinse and repeat for the sequence model, if applicable
-    chosen_components_seq = np.load(file_loc+'_chosen_components_seq.npy')    
-    components_binary_seq = np.load(file_loc+'_components_binary_seq.npy')
-    unchosen_components_binary_seq = np.load(file_loc+'_unchosen_components_binary_seq.npy')   
-    probabilities_seq = np.load(file_loc+'_probabilities_seq.npy')
-    unchosen_probabilities_seq = np.load(file_loc+'_unchosen_probabilities_seq.npy')
+    chosen_components_seq = np.load(data_file_loc+'_chosen_components_seq.npy')    
+    components_binary_seq = np.load(data_file_loc+'_components_binary_seq.npy')
+    unchosen_components_binary_seq = np.load(data_file_loc+'_unchosen_components_binary_seq.npy')   
+    probabilities_seq = np.load(data_file_loc+'_probabilities_seq.npy')
+    unchosen_probabilities_seq = np.load(data_file_loc+'_unchosen_probabilities_seq.npy')
     
     num_clusters = probabilities_seq.shape[1]
-    add_velocity, speed_only, add_change, num_PCs_used, window_size, windows_to_look_at, feature_max = np.load(file_loc + '_' + model_type + '_settings_seq.npy')
-    add_velocity, speed_only, add_change, num_PCs_used, window_size, windows_to_look_at = np.array([add_velocity, speed_only, add_change, num_PCs_used, window_size, windows_to_look_at]).astype(int)
+    add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at, feature_max = np.load(model_file_loc + '_' + model_type + '_settings_seq.npy')
+    add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at = np.array([add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at]).astype(int)
     
-    model = joblib.load(file_loc + '_' + model_type + '_seq')
+    model = joblib.load(model_file_loc + '_' + model_type + '_seq')
     
 
 
@@ -159,22 +167,22 @@ for n in range(num_clusters):
     
         # Also display an arrow indicating the mean velocity of that cluster
         if add_velocity:
-            velocity_of_current_epoch = mean_features_model[:,(t+1)*features_used-2-add_change+speed_only]
+            velocity_of_current_epoch = mean_features_model[:,(t+1)*features_used-1-add_turn]
             
             #if velocity includes negative values for whatever reason, make only positive by subtracting the lowest velocity value
-            min_velocity = np.min(mean_features_model[:,np.arange(features_used-2-add_change+speed_only,mean_features_model.shape[1] ,features_used)])
-            max_velocity = np.max(mean_features_model[:,np.arange(features_used-2-add_change+speed_only,mean_features_model.shape[1] ,features_used)])
+            min_velocity = np.min(mean_features_model[:,np.arange(features_used-1-add_turn,mean_features_model.shape[1] ,features_used)])
+            max_velocity = np.max(mean_features_model[:,np.arange(features_used-1-add_turn,mean_features_model.shape[1] ,features_used)])
             if min_velocity < 0:
                 velocity_of_current_epoch = velocity_of_current_epoch - min_velocity
                 max_velocity = max_velocity - min_velocity
                 
             arrow_height = velocity_of_current_epoch[n] / max_velocity
             
-            if not(speed_only) or add_change:
-                arrow_sideness = ((mean_features_array[(t+1)*features_used-1-add_change+speed_only,n] / np.max(mean_features_model[:,(t+1)*features_used-2+add_change])) + 1) / 2
+            if add_turn:
+                arrow_sideness = (mean_features_model[n,(t+1)*features_used-1] / np.max(mean_features_model[:,(t+1)*features_used-1]))
             else:
                 arrow_sideness = 0
-            cv2.arrowedLine(reconstruction_image,(10, trajectory_pose_size-10),(10+int(20*arrow_height), trajectory_pose_size - 10 - int(20*arrow_sideness)),(250,250,250),thickness=2)
+            cv2.arrowedLine(reconstruction_image,(10, trajectory_pose_size-10),(10+int(30*arrow_height), trajectory_pose_size - 10 - int(20*arrow_sideness)),(250,250,250),thickness=2)
 #        
         # Display mean pose
         title = 'trajectory ' + str(n+1)
@@ -195,7 +203,7 @@ for n in range(num_clusters):
 # -----------------------------------------------------
 num_frames = int(depth_vid.get(cv2.CAP_PROP_FRAME_COUNT))
 depth_vid.set(cv2.CAP_PROP_POS_FRAMES,start_frame)
-mouse_vid.set(cv2.CAP_PROP_POS_FRAMES,start_frame)
+mouse_vid.set(cv2.CAP_PROP_POS_FRAMES,frames[start_frame])
 
 if model_sequence:
     components_binary_to_display = components_binary_seq
@@ -263,12 +271,12 @@ ax_2D.plot(data_for_model_normalized[:,0:num_PCs_shown],linewidth=2)
 
 # plot the velocity
 if add_velocity:
-    ax_2D.plot(data_for_model_normalized[:,-2-add_change+speed_only], color = 'k',linewidth=2) #plot speed
-    if not(speed_only) or add_change: #plot turn speed or, if available, pose change
+    ax_2D.plot(data_for_model_normalized[:,-2-add_change+speed_only-add_turn], color = 'k',linewidth=2) #plot speed
+    if not(speed_only) or add_change or add_turn: #plot turn speed or, if available, pose change
         ax_2D.plot(data_for_model_normalized[:,-1], color = 'gray', linestyle = '--',linewidth=2)
 
 # Create legend
-legend_entries = create_legend(num_PCs_shown, add_velocity, speed_only, add_change)
+legend_entries = create_legend(num_PCs_shown, add_velocity, speed_only, add_change, add_turn)
 
 # Create line indicating which frame we're looking at
 center_line = ax_2D.plot([0,0],[-2,2],color = 'gray', linestyle = '--')
@@ -278,49 +286,68 @@ center_line = ax_2D.plot([0,0],[-2,2],color = 'gray', linestyle = '--')
 # ------------------------------------------------------------
 # Show behaviour and 3D videos, with selected pose also shown 
 # ------------------------------------------------------------
-i = start_frame - window_size*windows_to_look_at + 1
+
+j = min(find(frames>=start_frame - window_size*windows_to_look_at + 1)) 
+i = int(frames[j])
 while True:
-    ret1, frame1 = depth_vid.read() 
+    if out_of_bounds[i] == 0:
+        ret1, frame1 = depth_vid.read() 
+        
+    else:
+        chosen_color = [0,0,0]
+        
     ret2, frame2 = mouse_vid.read()
     
     if ret1 and ret2:
         # Grab frame number, which cluster is active, and its corresponding color
-        frame_num = int(depth_vid.get(cv2.CAP_PROP_POS_FRAMES))
-
-        chosen_component = chosen_components_to_display[i]
-        chosen_color = colors[chosen_component]       
+        frame_num_mouse = int(mouse_vid.get(cv2.CAP_PROP_POS_FRAMES))
+        frame_num_depth = int(depth_vid.get(cv2.CAP_PROP_POS_FRAMES))
         
-        # Grab the images to be displayed
-        depth_frame = frame1[:,:,0]
         mouse_frame = frame2[:,:,0]
         
-        # Resize and recolor images
-        depth_frame = cv2.resize(depth_frame,(450,450))
-        depth_frame = cv2.cvtColor(depth_frame, cv2.COLOR_GRAY2BGR)
-        mouse_frame = cv2.cvtColor(mouse_frame, cv2.COLOR_GRAY2BGR)        
-        depth_frame = (depth_frame * np.squeeze(color_array[:,:,:,chosen_component])).astype(uint8)
+        # Display data movie
+        if out_of_bounds[i] == 0: #mouse in arena
+            chosen_component = chosen_components_to_display[j]
+            chosen_color = colors[chosen_component]       
+            
+            # Grab the images to be displayed
+            depth_frame = frame1[:,:,0]
+            
+            
+            # Resize and recolor images
+            depth_frame = cv2.resize(depth_frame,(450,450))
+            depth_frame = cv2.cvtColor(depth_frame, cv2.COLOR_GRAY2BGR)
+            depth_frame = (depth_frame * np.squeeze(color_array[:,:,:,chosen_component])).astype(uint8)            
 
+            # Move the PC / clusters plot to be centered at the current frame
+            center_line.pop(0).remove()
+            center_line = ax_2D.plot([j,j],[-2,2],color = 'gray', linestyle = '--')
+            ax_2D.set_xlim([j-500,j+500])
+            plt.pause(0.01)
+            
+            #add to trajectory plot
+            if show_clusters and not show_clusters_all_at_once:
+                ax_3D.scatter(data_for_model_normalized[j,0], data_for_model_normalized[j,1], 
+                       data_for_model_normalized[j,-1],color=plot_colors[chosen_component],s=100,alpha=.5)
+            
+            
+        elif out_of_bounds[i] == 1: #mouse in shelter
+            depth_frame = shelter
+            
         # Add colored circle and frame number to behaviour image
+        mouse_frame = cv2.cvtColor(mouse_frame, cv2.COLOR_GRAY2BGR)
         cv2.circle(mouse_frame,(50,50),radius=25, color=chosen_color,thickness=50)
-        cv2.putText(mouse_frame,str(i),(50,400),0,1,255)
+        cv2.putText(mouse_frame,str(i),(50,1000),0,1,255)
         
-        # Display Images
-        cv2.imshow('depth',depth_frame)
+        # Display images
         cv2.imshow('behaviour',mouse_frame)
-        
-        # Move the PC / clusters plot to be centered at the current frame
-        center_line.pop(0).remove()
-        center_line = ax_2D.plot([i,i],[-2,2],color = 'gray', linestyle = '--')
-        ax_2D.set_xlim([i-500,i+500])
-        plt.pause(0.01)
-        
-        #add to trajectory plot
-        if show_clusters and not show_clusters_all_at_once:
-            ax_3D.scatter(data_for_model_normalized[i,0], data_for_model_normalized[i,1], 
-                   data_for_model_normalized[i,-1],color=plot_colors[chosen_component],s=100,alpha=.5)
+        cv2.imshow('depth',depth_frame)
         
         # update current frame index
-        i = frame_num - window_size*windows_to_look_at + 1
+        j = frame_num_depth - window_size*windows_to_look_at + 1
+        i = frame_num_mouse - window_size*windows_to_look_at + 1
+        
+        
         
         # stop video when donw
         if (frame_num)%500==0:
