@@ -34,7 +34,7 @@ def create_global_matchers(window_size = 1, min_disparity = 64, num_disparities 
 
     
 #%% ----------------------------------------------------------------------------------------------------------------------------------
-def get_background_mean(vid, vid2, two_videos, stereo, start_frame = 0, file_loc = '', avg_over = 100):
+def get_background_mean(vid, vid2, two_videos, stereo, start_frame = 0, file_location = '', avg_over = 100):
     save_file = file_loc + 'background_mat_avg.npy'
     if os.path.isfile(save_file):
         raise Exception('File already exists') 
@@ -96,7 +96,8 @@ def get_background_mean(vid, vid2, two_videos, stereo, start_frame = 0, file_loc
     
     return background_mat
     
-    
+
+
 #%% ----------------------------------------------------------------------------------------------------------------------------------
 def make_striped_background(height, width, min_disparity, roi_height, roi_width):
     stripeboardL = np.zeros((height, width)).astype(np.uint8)
@@ -262,7 +263,7 @@ def get_second_biggest_contour(frame, single_mouse_thresh, double_mouse_thresh):
     
 
 #%% ----------------------------------------------------------------------------------------------------------------------------------
-def flip_mouse(face_left, ellipse, topright_or_botleft, image, sausage_thresh = 1.1):
+def flip_mouse(face_left, ellipse, topright_or_botleft, image, sausage_thresh = 1.3):
     #get ellipse of mouse
     prev_ellipse = ellipse
     topright_or_botleft_prev = topright_or_botleft

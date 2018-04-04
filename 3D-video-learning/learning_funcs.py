@@ -6,7 +6,7 @@
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
 import pywt; import numpy as np; import matplotlib.pyplot as plt; from sklearn import mixture; from hmmlearn import hmm
-from sklearn.model_selection import KFold; import pdb; import os; from sklearn.externals import joblib
+from sklearn.model_selection import KFold; import pdb; import os; from sklearn.externals import joblib; import cv2; import scipy
 ''' #run these two lines to reload functions in script without having to start a new kernel
 %load_ext autoreload
 %autoreload 2
@@ -41,8 +41,8 @@ def add_velocity_as_feature(data_for_model, speed_only, add_turn, velocity, vel_
     #find 6 stdev, throw out those beyond that as spurious
     mean_vel = np.mean(velocity[:,0:2],axis=0)
     std_vel = np.std(velocity[:,0:2],axis=0)
-    velocity[abs(velocity[:,0]-mean_vel[0]) > 6*std_vel[0],0:2] = 0
-    velocity[abs(velocity[:,1]-mean_vel[1]) > 6*std_vel[1],0:2] = 0
+    velocity[abs(velocity[:,0]-mean_vel[0]) > 8*std_vel[0],0:2] = mean_vel[0] + 8*std_vel[0]
+    velocity[abs(velocity[:,1]-mean_vel[1]) > 8*std_vel[1],0:2] = mean_vel[1] + 8*std_vel[1]
     
     max_vel = np.max(abs(velocity[:,0:2]))
     max_pc = np.max(data_for_model)
@@ -109,9 +109,26 @@ def filter_features(data_for_model, filter_length, sigma):
 
     data_to_filter_model = np.zeros(data_for_model.shape)
     for pc in range(data_for_model.shape[1]): # apply filter to each feature
-        data_to_filter_model[:,pc] = np.convolve(data_for_model[:,pc],gauss_filter,mode='same')
+
+        array_to_filter=np.r_[data_for_model[filter_length:0:-1,pc],data_for_model[:,pc],data_for_model[-1:-filter_length-1:-1,pc]]
+        data_to_filter_model[:,pc] = np.convolve(array_to_filter,gauss_filter,mode='valid')        
+
     data_for_model = data_to_filter_model
     return data_for_model
+
+#def smooth(x,window_len=11,window='hanning'):
+#    """smooth the data using a window with requested size."""
+#    
+#    s=np.r_[x[window_len-1:0:-1],x,x[-2:-window_len-1:-1]]
+#
+#    if window == 'flat': #moving average
+#        w=np.ones(window_len,'d')
+#    else:
+#        w=eval('np.'+window+'(window_len)')
+#
+#    y=np.convolve(w/w.sum(),s,mode='valid')
+#    return y
+#
 
 
 #%% ----------------------------------------------------------------------------------------------------------------------------------
@@ -241,7 +258,8 @@ def cross_validate_model(data_for_cross_val, model_type, K_range, seed_range, nu
                     cross_val_matrix[k,2] = model.score(data_to_test) #score
                     if model_type=='gmm': #calculate BIC by hand, otherwise..?
                         cross_val_matrix[k,3] = model.bic(data_to_test) #bic
-                        
+                    else:
+                        cross_val_matrix[k,3] = len(train_index) * (n_components**2+n) - 2 * np.log(model.score(data_to_test))
                     k+=1
                     
                 output_matrix[n,0] = np.mean(cross_val_matrix[:,0]) #significant_probs
@@ -304,4 +322,21 @@ def cross_validate_model(data_for_cross_val, model_type, K_range, seed_range, nu
 
     return output_matrix
  
+#%% ----------------------------------------------------------------------------------------------------------------------------------
+def get_biggest_contour(frame):
+    _, contours, _ = cv2.findContours(np.array(frame), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE) 
+    cont_count = len(contours)
     
+    big_cnt_ind = 0
+    if cont_count > 1:
+        areas = np.zeros(cont_count)
+        for c in range(cont_count):
+            areas[c] = cv2.contourArea(contours[c])
+        big_cnt_ind = np.argmax(areas)
+        
+    cnt = contours[big_cnt_ind]
+    M = cv2.moments(cnt)
+    cx = int(M['m10']/M['m00'])    
+    cy = int(M['m01']/M['m00'])        
+    
+    return contours, big_cnt_ind, cx, cy, cnt

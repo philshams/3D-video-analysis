@@ -5,7 +5,7 @@
 
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
-import numpy as np; import cv2; import sklearn.decomposition; import os; 
+import numpy as np; import cv2; import sklearn.decomposition; import os; import warnings; warnings.filterwarnings('once')
 from learning_funcs import reconstruct_from_wavelet; from sklearn.externals import joblib
 
 
@@ -17,29 +17,26 @@ from learning_funcs import reconstruct_from_wavelet; from sklearn.externals impo
 # ------------------------------------------
 # Select data file name and folder location
 # ------------------------------------------
-file_loc = 'C:\Drive\Video Analysis\data\\'
-date = 'baseline_analysis\\'
-mouse_session = 'together_for_model\\'
-save_vid_names = ['normal_1_0', 'normal_1_1', 'normal_1_2',
-                  'normal_1_0_upside_down', 'normal_1_1_upside_down', 'normal_1_2_upside_down']
-pca_name = 'adaboost'
+file_location = 'C:\Drive\Video Analysis\data\\'
+data_folder = 'baseline_analysis\\'
+analysis_folder = 'together_for_model\\'
+
+concatenated_data_name_tag = 'analyze3' 
 
 # ---------------------------
 # Select analysis parameters
 # ---------------------------
-num_PCs_to_save = 12
-num_PCs_to_examine = 12
-append_save_additional_data = False
+num_PCs_to_save = 10
+num_PCs_to_examine = 10
+feature_relevance_threshold = 0.001
 
-save_PCs = False
+save_PCs = True
 examine_PCs = True
-cumulative_PCs = False
+cumulative_PCs = False #view reconstruction as the accumulation of PCs vs. using one PC at a time
 do_not_overwrite = True
 display_frame_rate = 40
+end_frame = 10000
 
-# these must be parameters taken from original wavelet transform 
-level = 5
-discard_scale = 4
 
 
 
@@ -51,29 +48,51 @@ discard_scale = 4
 # ------------------------------------------
 # Load wavelet-transformed data from file
 # ------------------------------------------
-file_loc_all = file_loc + date + mouse_session + pca_name
-feature_used_sum_together = np.zeros(39*39)
-for v in range(len(save_vid_names)):
-    file_loc_wavelet = file_loc + date + mouse_session + save_vid_names[v]
-    wavelet_file = file_loc_wavelet + '_wavelet.npy'
-    wavelet_slices_file = file_loc_wavelet + '_wavelet_slices.npy'
-    
-    wavelet_array = np.load(wavelet_file)
-    wavelet_array = np.reshape(wavelet_array,(39*39,wavelet_array.shape[2]))
-    coeff_slices = np.load(wavelet_slices_file)
-    
-    # ---------------------------------------------------
-    # Use only features that have non-zero values for PCA
-    # ---------------------------------------------------
-    feature_used = wavelet_array!=0
-    feature_used_sum = np.mean(feature_used,axis=1)
-    feature_used_sum_together = feature_used_sum_together + abs(feature_used_sum)
 
-relevant_features = feature_used_sum_together > 0 #change to zero to keep more features
+file_location_concatenated_data = file_location + data_folder + analysis_folder + concatenated_data_name_tag + '\\' + concatenated_data_name_tag
+session_name_tags = np.load(file_location_concatenated_data + '_session_name_tags.npy')
+print(session_name_tags)
 
-# also save the index of each of these features
-relevant_ind = find(relevant_features)
-np.save(file_loc_all + '_wavelet_relevant_ind.npy', relevant_ind)
+# these must be parameters taken from original wavelet transform 
+level = 5
+discard_scale = 4
+
+if os.path.isfile(file_location_wavelet + '_wavelet_relevant_ind_PCA.npy') and True:
+    relevant_ind = np.load(file_location_concatenated_data + '_wavelet_relevant_ind_PCA.npy')
+else:
+    feature_used_sum_together = np.zeros(39*39)
+    feature_used_std_together = np.zeros(39*39)
+    print('calculating relevant features...')
+    for v in range(len(session_name_tags)):
+        file_location_wavelet = file_location + data_folder + analysis_folder + session_name_tags[v] + '\\' + session_name_tags[v]
+        if os.path.isfile(file_location_wavelet + '_wavelet_corrected.npy'):
+            wavelet_file = file_location_wavelet + '_wavelet_corrected.npy'
+        else:
+            wavelet_file = file_location_wavelet + '_wavelet.npy'
+            print('loaded non-flip-corrected data')
+    
+        wavelet_slices_file = file_location_wavelet + '_wavelet_slices.npy'
+        
+        wavelet_array = np.load(wavelet_file)
+        wavelet_array = np.reshape(wavelet_array,(39*39,wavelet_array.shape[2]))
+        coeff_slices = np.load(wavelet_slices_file)
+        
+        # ---------------------------------------------------
+        # Use only features that have non-zero values for PCA
+        # ---------------------------------------------------
+        feature_used = wavelet_array!=0
+        feature_used_sum = np.mean(feature_used,axis=1)
+        feature_used_sum_together = feature_used_sum_together + abs(feature_used_sum)
+        
+        feature_used_std = np.std(wavelet_array,axis=1)
+        feature_used_std_together = feature_used_std_together + feature_used_std
+    
+    relevant_features = (feature_used_sum_together >= feature_relevance_threshold) * (feature_used_std_together >= feature_relevance_threshold) #change to zero to keep more features
+    
+    # also save the index of each of these features
+    relevant_ind = find(relevant_features)
+    np.save(file_location_concatenated_data + '_wavelet_relevant_ind_PCA.npy', relevant_ind)
+   
 
 print(str(sum(relevant_features)) + ' relevant features retained from wavelet transform')
 print('')
@@ -87,10 +106,15 @@ print('')
 #-----------------------------------------------------------------------------------------------------------------------------------------
 
 wavelet_array_relevant_features = np.zeros((1,len(relevant_ind)))
-for v in range(len(save_vid_names)):
-    file_loc_wavelet = file_loc + date + mouse_session + save_vid_names[v]
-    wavelet_file = file_loc_wavelet + '_wavelet.npy'
-    wavelet_slices_file = file_loc_wavelet + '_wavelet_slices.npy'
+for v in range(len(session_name_tags)):
+    file_location_wavelet = file_location + data_folder + analysis_folder + session_name_tags[v] + '\\' + session_name_tags[v]
+    if os.path.isfile(file_location_wavelet + '_wavelet_corrected.npy'):
+        wavelet_file = file_location_wavelet + '_wavelet_corrected.npy'
+    else:
+        wavelet_file = file_location_wavelet + '_wavelet.npy'
+        print('loaded non-flip-corrected data')
+
+    wavelet_slices_file = file_location_wavelet + '_wavelet_slices.npy'
     
     wavelet_array = np.load(wavelet_file)
     wavelet_array = np.reshape(wavelet_array,(39*39,wavelet_array.shape[2]))
@@ -112,15 +136,14 @@ if examine_PCs:
     pca.fit(wavelet_array_relevant_features) # input: (samples, features)
     for n_com in range(0,num_PCs_to_examine):
 
-
         # -----------------------------------
         # Compute the expansion coefficients
         # -----------------------------------        
         if cumulative_PCs:  # Reconstruct the data based on all the PCs taken so far
-            coeffs = pca.transform(wavelet_array_relevant_features).T[0:n_com+1,:]
+            coeffs = pca.transform(wavelet_array_relevant_features).T[0:n_com+1,0:end_frame]
             wavelet_array_relevant_features_recon = pca.inverse_transform(coeffs.T)
         else:               # Reconstruct the data based on only the current PC
-            coeffs = pca.transform(wavelet_array_relevant_features).T[n_com:n_com+1,:]
+            coeffs = pca.transform(wavelet_array_relevant_features).T[n_com:n_com+1,0:end_frame]
             wavelet_array_relevant_features_recon = (pca.components_[n_com:n_com+1].T@coeffs).astype(float).T + wavelet_relevant_mean
         
         # -----------------------------------
@@ -173,13 +196,13 @@ if save_PCs:
     # --------------------------------
     # Save the model and coefficients
     # -------------------------------- 
-    save_file = file_loc_all + '_pca_coeffs.npy'
-    save_file_model = file_loc_all + '_pca'
+    save_file = file_location_concatenated_data + '_pca_coeffs.npy'
+    save_file_model = file_location_concatenated_data + '_pca'
     if (os.path.isfile(save_file) or os.path.isfile(save_file_model)) and do_not_overwrite:
         raise Exception('File already exists') 
     joblib.dump(pca, save_file_model)
     np.save(save_file, pca_coeffs)
-    np.save(file_loc_all + '_wavelet_slices.npy', coeff_slices)
+
     
 
 

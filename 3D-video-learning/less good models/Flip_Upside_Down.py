@@ -15,14 +15,12 @@ data_folder = 'baseline_analysis\\'
 analysis_folder = 'together_for_model\\'
 session_name_tags = ['normal_1_0','normal_1_1','normal_1_2',
                     'normal_2_0','normal_2_1','normal_2_2',
-                    'normal_3_0','normal_3_1',
+                    'normal_3_0','normal_3_1','normal_3_2',
                     'normal_4_0','normal_4_1','normal_4_2',
                     'normal_5_0','normal_5_1',
                     'normal_6_0','normal_6_1','normal_6_2',
                     'clicks_1_0','clicks_2_0','clicks_3_0',
                     'post_clicks_1_0','post_clicks_2_0','post_clicks_3_0']
-
-session_name_tags = ['normal_5_1']
 
 file_location = file_location + data_folder + analysis_folder
 
@@ -49,7 +47,7 @@ do_not_overwrite = False
 # ----------------------
 for v in range(len(session_name_tags)):
     session_name_tag = session_name_tags[v]
-    file_location_vid = file_location + session_name_tag
+    file_location_vid = file_location + session_name_tag + '\\' + session_name_tag
     print(file_location_vid)
     vid = cv2.VideoCapture(file_location_vid + '_data.avi')
     num_frames = int(vid.get(cv2.CAP_PROP_FRAME_COUNT))

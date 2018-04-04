@@ -22,47 +22,34 @@ file_location = 'C:\Drive\Video Analysis\data\\'
 data_folder = 'baseline_analysis\\'
 analysis_folder = 'together_for_model\\'
 
-concatenated_data_name_tag = 'analyze3' 
+concatenated_data_name_tag = 'analyze' 
 
 
 # Select session directory and video
 session_name_tag = 'normal_1_0'
-#session_name_tag = 'post_clicks_3_0'
-#session_video_folder = 'C:\\Drive\\Video Analysis\\data\\baseline_analysis\\17.03.2018\\215_1b\\'
-#session_video = session_video_folder + 'Chronic_Mantis_stim_background_clicks-default-4126343-video-0.avi'
 session_video_folder = 'C:\\Drive\\Video Analysis\\data\\baseline_analysis\\27.02.2018\\205_1a\\'
 session_video = session_video_folder + 'Chronic_Mantis_stim-default-996386-video-0.avi'
-
 
 # --------------------------------
 # Select visualization parameters 
 # --------------------------------
 model_type = 'hmm'
-model_sequence = True
+model_sequence = False
 
-frame_rate = 100
-start_frame = 3000
+frame_rate = 1000
+start_frame = 5000
 stop_frame = 40000
 
 show_clusters = False
 show_clusters_all_at_once = False
-show_shelter = True #not currently functional...add show_wavelets_corrected!
-show_PC_plot = False
+show_shelter = True
+show_PC_plot = True
 
 only_see_component = 3
-only_see = True
+only_see = False
 
-model_name_tag = '14'
-#4PC_4 4PC_5 6PC_4 6PC_5
+model_name_tag = ''
 
-#14: 'sniff around' (good), 'stretch or stand' (fair), 'pose shift' (fair), 'groom, hunched sniff, rear'(fair), 'locomote' (good)
-#15_4: 'look around, turn' (good), 'outstretched sniff' (good), locomote,  'groom, hunched sniff, rear' (good)
-
-#11: 'outstretch to investigate' (good), 'groom, hunched sniff, rear' (bad)
-#15:  'active investigate' (fair), 'groom, hunched sniff, rear' (good), 'stretch or stand' (fair), locomote(good), 'lazy sniff around' (shite)
-#16:   locomote, shite, 'outstretch to investigate' (good)  'active sniff (turn to investigate)' (fair), 'groom, hunched sniff, rear'(good)
-#18nt: 'sniff around' (meh) shite
-#15_4: 
 
 #%% -------------------------------------------------------------------------------------------------------------------------------------
 #-----------------------                            Load data, models, and video                    -----------------------------------
@@ -79,20 +66,16 @@ mouse_vid = cv2.VideoCapture(session_video)
 
 
 #load data
-if not model_sequence:
-    data_for_model_normalized = np.load(file_location_concatenated_data +'_data_for_' + model_type + '_normalized.npy')
-    chosen_components = np.load(file_location_concatenated_data+'_chosen_components' + str(model_name_tag) + '.npy')
-    components_binary = np.load(file_location_concatenated_data+'_components_binary' + str(model_name_tag) + '.npy')
-    unchosen_components_binary = np.load(file_location_concatenated_data+'_unchosen_components_binary' + str(model_name_tag) + '.npy')
-    probabilities = np.load(file_location_concatenated_data+'_probabilities' + str(model_name_tag) + '.npy')
-    unchosen_probabilities = np.load(file_location_concatenated_data+'_unchosen_probabilities' + str(model_name_tag) + '.npy')
-    
-    num_clusters = probabilities.shape[1]
-    model = joblib.load(file_location_concatenated_data + '_' + model_type + str(model_name_tag)) #load model
+data_for_model_normalized = np.load(file_location_concatenated_data +'_data_for_' + model_type + '_normalized.npy')
+chosen_components = np.load(file_location_concatenated_data+'_chosen_components' + str(model_name_tag) + '.npy')
+components_binary = np.load(file_location_concatenated_data+'_components_binary' + str(model_name_tag) + '.npy')
+unchosen_components_binary = np.load(file_location_concatenated_data+'_unchosen_components_binary' + str(model_name_tag) + '.npy')
+probabilities = np.load(file_location_concatenated_data+'_probabilities' + str(model_name_tag) + '.npy')
+unchosen_probabilities = np.load(file_location_concatenated_data+'_unchosen_probabilities' + str(model_name_tag) + '.npy')
 
 add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at, feature_max = np.load(file_location_concatenated_data + '_' + model_type + '_settings.npy')
 add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at = np.array([add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at]).astype(int)
-
+num_clusters = probabilities.shape[1] #load model settings
 
 pca = joblib.load(file_location_concatenated_data + '_pca') #load transform info for reconstruction
 relevant_ind = np.load(file_location_concatenated_data + '_wavelet_relevant_ind_PCA.npy')
@@ -124,21 +107,20 @@ if show_shelter:
     shelter = cv2.imread('C:\\Drive\\Video Analysis\\data\\calibration_images\\shelter\\shelter.png')
     shelter = cv2.resize(shelter,(450,450))
     
+model = joblib.load(file_location_concatenated_data + '_' + model_type + str(model_name_tag)) #load model
 
 if model_sequence: #rinse and repeat for the sequence model, if applicable
-    chosen_components_seq = np.load(file_location_concatenated_data+'_chosen_components_seq' + str(model_name_tag) + '.npy')    
-    components_binary_seq = np.load(file_location_concatenated_data+'_components_binary_seq' + str(model_name_tag) + '.npy')
-    unchosen_components_binary_seq = np.load(file_location_concatenated_data+'_unchosen_components_binary_seq' + str(model_name_tag) + '.npy')   
-    probabilities_seq = np.load(file_location_concatenated_data+'_probabilities_seq' + str(model_name_tag) + '.npy')
-    unchosen_probabilities_seq = np.load(file_location_concatenated_data+'_unchosen_probabilities_seq' + str(model_name_tag) + '.npy')
+    chosen_components_seq = np.load(file_location_concatenated_data+'_chosen_components_seq.npy')    
+    components_binary_seq = np.load(file_location_concatenated_data+'_components_binary_seq.npy')
+    unchosen_components_binary_seq = np.load(file_location_concatenated_data+'_unchosen_components_binary_seq.npy')   
+    probabilities_seq = np.load(file_location_concatenated_data+'_probabilities_seq.npy')
+    unchosen_probabilities_seq = np.load(file_location_concatenated_data+'_unchosen_probabilities_seq.npy')
     
     num_clusters = probabilities_seq.shape[1]
-    add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at, feature_max = np.load(file_location_concatenated_data + '_' + model_type + '_settings_seq' +  str(model_name_tag) + '.npy')
+    add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at, feature_max = np.load(file_location_concatenated_data + '_' + model_type + '_settings_seq.npy')
     add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at = np.array([add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at]).astype(int)
     
-    num_clusters = probabilities_seq.shape[1] #load model settings
-        
-    model = joblib.load(file_location_concatenated_data + '_' + model_type + '_seq' + str(model_name_tag))
+    model = joblib.load(file_location_concatenated_data + '_' + model_type + '_seq')
     
 
 
@@ -163,7 +145,7 @@ elif model_type == 'gmm':
 # Set up colors
 colors = [[0,0,255],[169,118,14],[10,205,10],[160,0,120],[0,80,120],[170,120,220],[0,140,140],[100,100,100]]*3
 plot_colors = ['red','deepskyblue','green','blueviolet','orange','lightpink','yellow','white']
-trajectory_pose_size = 300
+trajectory_pose_size = 400
 
 color_array = np.zeros((trajectory_pose_size,trajectory_pose_size,3,len(colors))) #create coloring arrays
 for c in range(len(colors)):
@@ -181,63 +163,74 @@ for i in range(2*windows_to_look_at):
     if (i%2==1):
         offset+=1
     
-# Plot the mean trajectory or pose:
-for n in range(num_clusters):
-    trajectory = np.zeros((trajectory_pose_size,trajectory_pose_size*(2*windows_to_look_at + 1),3)).astype(np.uint8) #initialize mean trajectory image
-    for t in range(2*windows_to_look_at + 1):
-        # Get the mean features for that pose
-        mean_features = mean_features_model[n,t*features_used:(t+1)*features_used] 
-        
-        # Reconstruct wavelet-transformed data from the PCs
-        mean_wavelet_relevant_features = pca.inverse_transform(np.append(mean_features[0:num_PCs_used],np.zeros(10-num_PCs_used)))
-        mean_wavelet = np.zeros(39*39)
-        mean_wavelet[relevant_ind] = mean_wavelet_relevant_features
-        mean_wavelet_array = np.reshape(mean_wavelet,(39,39))
-         
-        # Reconstruct image in pixel space from wavelet-transformed reconstruction
-        reconstruction_from_wavelet  = reconstruct_from_wavelet(mean_wavelet_array,coeff_slices, level, discard_scale)
-        reconstruction_image= cv2.resize(abs(reconstruction_from_wavelet).astype(np.uint8),(trajectory_pose_size,trajectory_pose_size))
-        reconstruction_image= cv2.cvtColor(reconstruction_image, cv2.COLOR_GRAY2BGR)
-        reconstruction_image = (reconstruction_image * np.squeeze(color_array[:,:,:,n])).astype(uint8)
-        
-        #rotate image
-        M = cv2.getRotationMatrix2D((int(trajectory_pose_size/2),int(trajectory_pose_size/2)),-90,1)
-        reconstruction_image = cv2.warpAffine(reconstruction_image,M,(trajectory_pose_size,trajectory_pose_size)) 
     
-        # Also display an arrow indicating the mean velocity of that cluster
-        if add_velocity:
-            velocity_of_current_epoch = mean_features_model[:,(t+1)*features_used-1-add_turn]
-            #if velocity includes negative values for whatever reason, make only positive by subtracting the lowest velocity value
-            min_velocity = np.min(mean_features_model[:,np.arange(features_used-1-add_turn,mean_features_model.shape[1] ,features_used)])
-            max_velocity = np.max(mean_features_model[:,np.arange(features_used-1-add_turn,mean_features_model.shape[1] ,features_used)])
-            if min_velocity < 0:
-                velocity_of_current_epoch = velocity_of_current_epoch - min_velocity
-                max_velocity = max_velocity - min_velocity
-            arrow_speed = velocity_of_current_epoch[n] / max_velocity
-            
-            if add_turn:
-                turn_of_current_epoch = mean_features_model[:,(t+1)*features_used-1]
-                #if velocity includes negative values for whatever reason, make only positive by subtracting the lowest velocity value
-                min_turn = np.min(mean_features_model[:,np.arange(features_used-1,mean_features_model.shape[1] ,features_used)])
-                max_turn = np.max(mean_features_model[:,np.arange(features_used-1,mean_features_model.shape[1] ,features_used)])
-                if min_turn < 0:
-                    turn_of_current_epoch = turn_of_current_epoch - min_turn
-                    max_turn = max_turn - min_turn
-                arrow_turn = turn_of_current_epoch[n] / max_turn
-#                arrow_turn = (mean_features_model[n,(t+1)*features_used-1] / np.max(mean_features_model[:,(t+1)*features_used-1]))
 
+
+# Plot the mean trajectory or pose:
+for n in [2]:
+    #reencode and save video
+    file_location_save = file_loc = 'C:\Drive\Video Analysis\data\\calibration_images\\shelter\\'
+    fourcc = cv2.VideoWriter_fourcc(*'XVID') #LJPG for lossless, XVID or MJPG works for compressed
+    rotator = cv2.VideoWriter(file_location_save + str(n) +'.avi', fourcc , 40, (trajectory_pose_size,trajectory_pose_size)) 
+
+    for i in range(10):
+        for angle in range(360):
+            trajectory = np.zeros((trajectory_pose_size,trajectory_pose_size*(2*windows_to_look_at + 1),3)).astype(np.uint8) #initialize mean trajectory image
+            for t in range(2*windows_to_look_at + 1):
+                # Get the mean features for that pose
+                mean_features = mean_features_model[n,t*features_used:(t+1)*features_used] 
                 
-            else:
-                arrow_turn = 0
-            cv2.arrowedLine(reconstruction_image,(10, trajectory_pose_size-10),(10+int(50*arrow_speed), trajectory_pose_size - 10 - int(10*arrow_turn)),(250,250,250),thickness=2)
-#        
-        # Display mean pose
-        title = 'trajectory ' + str(n+1)
-        trajectory[:,trajectory_pose_size*(t):trajectory_pose_size*(t+1),:] = reconstruction_image
-        cv2.imshow(title,trajectory)
-        if cv2.waitKey(int(100)) & 0xFF == ord('q'):
-            break
-
+                # Reconstruct wavelet-transformed data from the PCs
+                mean_wavelet_relevant_features = pca.inverse_transform(np.append(mean_features[0:num_PCs_used],np.zeros(10-num_PCs_used)))
+                mean_wavelet = np.zeros(39*39)
+                mean_wavelet[relevant_ind] = mean_wavelet_relevant_features
+                mean_wavelet_array = np.reshape(mean_wavelet,(39,39))
+                 
+                # Reconstruct image in pixel space from wavelet-transformed reconstruction
+                reconstruction_from_wavelet  = reconstruct_from_wavelet(mean_wavelet_array,coeff_slices, level, discard_scale)
+                reconstruction_image= cv2.resize(abs(reconstruction_from_wavelet).astype(np.uint8),(trajectory_pose_size,trajectory_pose_size))
+                reconstruction_image= cv2.cvtColor(reconstruction_image, cv2.COLOR_GRAY2BGR)
+                reconstruction_image = (reconstruction_image * np.squeeze(color_array[:,:,:,n])).astype(uint8)
+                
+                #rotate image
+                M = cv2.getRotationMatrix2D((int(trajectory_pose_size/2),int(trajectory_pose_size/2)),-90-angle,1)
+                reconstruction_image = cv2.warpAffine(reconstruction_image,M,(trajectory_pose_size,trajectory_pose_size)) 
+            
+                # Also display an arrow indicating the mean velocity of that cluster
+                if add_velocity:
+                    velocity_of_current_epoch = mean_features_model[:,(t+1)*features_used-1-add_turn]
+                    #if velocity includes negative values for whatever reason, make only positive by subtracting the lowest velocity value
+                    min_velocity = np.min(mean_features_model[:,np.arange(features_used-1-add_turn,mean_features_model.shape[1] ,features_used)])
+                    max_velocity = np.max(mean_features_model[:,np.arange(features_used-1-add_turn,mean_features_model.shape[1] ,features_used)])
+                    if min_velocity < 0:
+                        velocity_of_current_epoch = velocity_of_current_epoch - min_velocity
+                        max_velocity = max_velocity - min_velocity
+                    arrow_speed = velocity_of_current_epoch[n] / max_velocity
+                    
+                    if add_turn:
+                        turn_of_current_epoch = mean_features_model[:,(t+1)*features_used-1]
+                        #if velocity includes negative values for whatever reason, make only positive by subtracting the lowest velocity value
+                        min_turn = np.min(mean_features_model[:,np.arange(features_used-1,mean_features_model.shape[1] ,features_used)])
+                        max_turn = np.max(mean_features_model[:,np.arange(features_used-1,mean_features_model.shape[1] ,features_used)])
+                        if min_turn < 0:
+                            turn_of_current_epoch = turn_of_current_epoch - min_turn
+                            max_turn = max_turn - min_turn
+                        arrow_turn = turn_of_current_epoch[n] / max_turn
+        #                arrow_turn = (mean_features_model[n,(t+1)*features_used-1] / np.max(mean_features_model[:,(t+1)*features_used-1]))
+        
+                        
+                    else:
+                        arrow_turn = 0
+                    cv2.arrowedLine(reconstruction_image,(10, trajectory_pose_size-10),(10+int(50*arrow_speed), trajectory_pose_size - 10 - int(10*arrow_turn)),(250,250,250),thickness=2)
+        #        
+                # Display mean pose
+                title = 'trajectory ' + str(n+1)
+                trajectory[:,trajectory_pose_size*(t):trajectory_pose_size*(t+1),:] = reconstruction_image
+                cv2.imshow(title,trajectory)
+                rotator.write(trajectory)
+                if cv2.waitKey(int(1)) & 0xFF == ord('q'):
+                    break
+    rotator.release()
 
 
 #%% -------------------------------------------------------------------------------------------------------------------------------------
@@ -304,10 +297,10 @@ if show_PC_plot:
             
        
     # Plot the corresponding poses along y = 0 for sequence analysis
-#    if model_sequence:
-#        for n in range(probabilities.shape[1]):
-#            component_frames = find(components_binary[:,n])
-#            ax_2D.scatter(component_frames,np.ones(len(component_frames))*0,color=plot_colors[n],alpha=.5,marker='|',s=700)
+    if model_sequence:
+        for n in range(probabilities.shape[1]):
+            component_frames = find(components_binary[:,n])
+            ax_2D.scatter(component_frames,np.ones(len(component_frames))*0,color=plot_colors[n],alpha=.5,marker='|',s=700)
     
     
     # Now plot the components of the chosen model (pose or sequence)
@@ -342,7 +335,7 @@ if show_PC_plot:
 #j = min(find(frames>=start_frame - window_size*windows_to_look_at + 1)) 
 #i = int(frames[j])
 #i = start_frame - window_size*windows_to_look_at + 1 #is this right...
-i = start_frame - window_size*windows_to_look_at
+i = start_frame - window_size*windows_to_look_at 
 j = min(find(frames>=(start_frame - window_size*windows_to_look_at)))
 while True:
 #    if out_of_bounds[i] == 0:
@@ -362,14 +355,14 @@ while True:
         # Display data movie
         if out_of_bounds[i] == 0: #mouse in arena
             chosen_component = chosen_components_to_display[j]
-#            print('head direction: ' + str(head_dir[i]))
-#            print('vel forward: ' + str(vel_forward[i]))
-#            print('vel ortho: ' + str(vel_ortho[i]))
-#            print('position: ' + str((pos_x[i], pos_y[i])))
-#            if disruptions[i]:
-#                print('disrupted')
-#                print(i)
-#            print('')
+            print('head direction: ' + str(head_dir[i]))
+            print('vel forward: ' + str(vel_forward[i]))
+            print('vel ortho: ' + str(vel_ortho[i]))
+            print('position: ' + str((pos_x[i], pos_y[i])))
+            if disruptions[i]:
+                print('disrupted')
+                print(i)
+            print('')
             if only_see and chosen_component != only_see_component:
                 j+=1
                 i = frame_num_mouse - window_size*windows_to_look_at + 1
@@ -389,7 +382,7 @@ while True:
             if show_PC_plot:
                 center_line.pop(0).remove()
                 center_line = ax_2D.plot([j,j],[-2,2],color = 'gray', linestyle = '--')
-                ax_2D.set_xlim([j-150,j+150])
+                ax_2D.set_xlim([j-200,j+200])
                 plt.pause(0.01)
                 
             #add to trajectory plot

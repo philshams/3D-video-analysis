@@ -19,11 +19,11 @@ from depth_funcs import flip_mouse, correct_flip, write_videos
 # ------------------------------------------
 
 file_location = 'C:\Drive\Video Analysis\data\\baseline_analysis\\'
-date = '27.02.2018\\'
-session_name = '205_1a\\'
-session_name_tag = 'normal_1_' # name-tag to be associated with all saved files
-video_name = 'Chronic_Mantis_stim-default-996386-video-'
-videos = [0,1,2]
+date = '17.03.2018\\'
+session_name = '215_1b\\'
+session_name_tag = 'post_clicks_3_' # name-tag to be associated with all saved files
+video_name = 'Chronic_Mantis_stim_background_clicks-default-4126343-video-'
+videos = [0]
 
 file_location = file_location + date + session_name 
 
@@ -33,8 +33,8 @@ file_location = file_location + date + session_name
 # --------------------
 frame_rate = 40 #aesthetic frame rate of saved videos
 display_frame_rate = 1000 #1000 makes it as fast as possible
-start_frame = 0
-end_frame = np.inf #set as either desired end frame or np.inf to go to end of movie
+start_frame = 7300
+stop_frame = np.inf #set as either desired end frame or np.inf to go to end of movie
 
 
 # ----------------------------
@@ -43,6 +43,7 @@ end_frame = np.inf #set as either desired end frame or np.inf to go to end of mo
 mask_thresh = .42 #mouse mask threshold (lower is more stringently darker than background)
 kernel = [4,3] #erosion and dilation kernel sizes for mouse mask
 iters = [0,7] #number of erosion and dilation iterations for mouse mask
+
 
 
 # -----------------------
@@ -60,7 +61,7 @@ shelter = True
 wispy_thresh = 1.3 
 wispy_erosions = 8 
 speed_thresh = 4.5
-width_thresh= 1.3
+width_thresh= 1.35
 
 
 # -----------------------
@@ -68,7 +69,7 @@ width_thresh= 1.3
 # -----------------------
 show_images = True
 save_data = True
-write_images = True
+write_images = False
 do_not_overwrite = False
 
 
@@ -168,6 +169,27 @@ arena_center = [arena_roi[0]+arena_roi[2]/2, arena_roi[1]+arena_roi[3]/2]
 arena_radius = np.mean([arena_center[0] - arena_roi[0],arena_roi[0]+arena_roi[2] - arena_center[0],arena_center[1] -  arena_roi[1], arena_roi[1]+arena_roi[3] - arena_center[0]])
 
 
+# initialize mouse orientation detection
+faceleft = -1 #1 or -1 : initial orientation
+topright_or_botleft = 1
+topright_or_botleft_prev = 1
+depth_ratio = np.ones(3)
+cxL = 0
+cyL = 0
+move_prev = 0
+history_x = np.zeros(4)
+history_y = np.zeros(4)
+ellipse = 0
+ellipse_width = 0
+slope_recipr = 1
+disruption = 1
+
+#initialize erosion/dilation kernels
+kernel_er = np.ones((kernel[0],kernel[0]),np.uint8)
+kernel_dil = np.ones((kernel[1],kernel[1]),np.uint8)
+kernel_head = np.ones((9,9),np.uint8)
+    
+    
 # initialize mouse video
 for v in videos:
         
@@ -177,33 +199,13 @@ for v in videos:
     print(file + ' loaded')
     width = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT)) 
-    end_frame = min(end_frame, vid.get(cv2.CAP_PROP_FRAME_COUNT)-5)
+    end_frame = min(stop_frame, vid.get(cv2.CAP_PROP_FRAME_COUNT)-5)
     if width==0:
         raise Exception('Video file not found')
     vid.set(cv2.CAP_PROP_POS_FRAMES,start_frame)
     out_of_bound = 0
     padding = True
-    
-    # initialize mouse orientation detection
-    faceleft = -1 #1 or -1 : initial orientation
-    topright_or_botleft = 1
-    topright_or_botleft_prev = 1
-    depth_ratio = np.ones(3)
-    cxL = 0
-    cyL = 0
-    move_prev = 0
-    history_x = np.zeros(4)
-    history_y = np.zeros(4)
-    ellipse = 0
-    ellipse_width = 0
-    slope_recipr = 1
-    disruption = 1
-    
-    #initialize erosion/dilation kernels
-    kernel_er = np.ones((kernel[0],kernel[0]),np.uint8)
-    kernel_dil = np.ones((kernel[1],kernel[1]),np.uint8)
-    kernel_head = np.ones((9,9),np.uint8)
-    
+       
     
     # ----------------------
     # Select videos to save 
@@ -229,7 +231,7 @@ for v in videos:
         mouse_coordinates = []
         mouse_velocity = []
         disruptions = []
-        out_of_bounds = [] #0 is in bounds, 1 is in shelter, 2 is other
+    out_of_bounds = [] #0 is in bounds, 1 is in shelter, 2 is other
      
         
     
@@ -244,8 +246,10 @@ for v in videos:
         # grab the frame
         ret, frame = vid.read()
         frame_num = vid.get(cv2.CAP_PROP_POS_FRAMES) 
+        if frame_num > end_frame:
+            print('fin')
+            break 
 
-        
         if ret:  
 
             # ------------------------------
@@ -313,8 +317,9 @@ for v in videos:
             else:
                 shadow=0
                 
-            if np.sum(frame_norm_mask) > 7000: #if Dario comes into the arena
+            if np.sum(frame_norm_mask) > 30000: #if Dario comes into the arena
                 print('what are you doing there?')
+                print(np.sum(frame_norm_mask))
                 disruption = 1
                 out_of_bound = 2
                 out_of_bounds.append(out_of_bound)                
@@ -381,7 +386,7 @@ for v in videos:
             # flip mouse into the correct orientation
             try:
                 rotate_angle, faceleft, ellipse, topright_or_botleft, ellipse_width = \
-                flip_mouse(faceleft, ellipse, topright_or_botleft,frame_masked_cropped , sausage_thresh = 1.1)
+                flip_mouse(faceleft, ellipse, topright_or_botleft,frame_masked_cropped , sausage_thresh = width_thresh)
             except:
                 raise Exception('mouse out of bounds but not captured above...')
                 disruption = 1
@@ -497,7 +502,7 @@ for v in videos:
         except:
             print('session spent in shelter')
         np.save(file_location_save + '_velocity.npy', mouse_velocity)
-        np.save(file_location_save + '_frames', data_times)
+        np.save(file_location_save + '_frames', data_times-start_frame)
         np.save(file_location_save + '_disruption', disruptions)
         np.save(file_location_save + '_out_of_bounds', out_of_bounds)
     

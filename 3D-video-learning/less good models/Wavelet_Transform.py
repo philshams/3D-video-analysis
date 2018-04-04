@@ -27,22 +27,23 @@ session_name_tags = ['normal_1_0','normal_1_1','normal_1_2',
                     'clicks_1_0','clicks_2_0','clicks_3_0',
                     'post_clicks_1_0','post_clicks_2_0','post_clicks_3_0']
 
-upside_down = False #use flipped frames to create the LDA model
+session_name_tags = ['normal_1_0','normal_1_1','normal_1_2']
 
+upside_down = False #use flipped frames to create the LDA model
 straighten_upside_down_frames = False #use existing LDA to straighten upside-down frames
     
 
 # ---------------------------
 # Select analysis parameters
 # ---------------------------
-frame_rate = 1000
+frame_rate = 60
 end_frame = np.inf
-show_images = False
-save_wavelets = True
+show_images = True
+save_wavelets = False
 
-save_concatenate_data = True
-only_save_concatenate_data = True
-concatenated_data_name_tag = 'all'
+save_concatenate_data = False
+only_save_concatenate_data = False
+concatenated_data_name_tag = 'session_1'
 do_not_overwrite = False
 
 level = 5 # how many different spatial scales to use
@@ -70,6 +71,8 @@ if save_concatenate_data:
     velocity = np.array(([],[],[],[])).T
     disruption = []
     out_of_bounds = []
+    
+file_location_concatenated_data = file_location + data_folder + analysis_folder + concatenated_data_name_tag   + '\\' + concatenated_data_name_tag   
         
 for v in range(len(session_name_tags)):
     session_name_tag = session_name_tags[v]
@@ -94,7 +97,7 @@ for v in range(len(session_name_tags)):
         wavelet_array = np.zeros((39,39,stop_frame)).astype(np.float16)
         
         # load LDA model
-        file_location_concatenated_data = file_location + data_folder + analysis_folder + concatenated_data_name_tag   
+        
         if straighten_upside_down_frames:
             lda = joblib.load(file_location_concatenated_data + '_lda')
             relevant_ind = np.load(file_location_concatenated_data + '_wavelet_relevant_ind_LDA.npy')
@@ -108,7 +111,7 @@ for v in range(len(session_name_tags)):
             if ret: 
                 # grab and resize the frame
                 frame_num = int(vid.get(cv2.CAP_PROP_POS_FRAMES))
-                frame = frame[:,:,0]
+                frame = frame[:,:,0]*2
                 if width != 150:
                     frame = cv2.resize(frame,(150,150)) #resize
                 
@@ -134,7 +137,7 @@ for v in range(len(session_name_tags)):
                     # check if image is flipped
                     # --------------------------  
                     if straighten_upside_down_frames and flip==0:
-                        features = np.resize(coeff_array,(39*39))[relevant_ind]
+                        features = np.resize(coeff_array,(39*39))[relevant_ind] ##have to normalize!
                         predicted_prob_straight = lda.predict_proba(features)[1]
                         if predicted_prob_straight > flip_threshold: # if frame is upside-down
                             #flip frame

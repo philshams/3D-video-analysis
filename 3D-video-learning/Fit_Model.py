@@ -5,7 +5,7 @@
 
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
-import numpy as np; from matplotlib import pyplot as plt; from scipy import linalg
+import numpy as np; from matplotlib import pyplot as plt; from scipy import linalg; import os; import sklearn; from sklearn.externals import joblib
 from sklearn import mixture; from sklearn.model_selection import KFold; from hmmlearn import hmm; import warnings; warnings.filterwarnings('ignore')
 from learning_funcs import cross_validate_model, add_velocity_as_feature, add_pose_change_as_feature, create_sequential_data
 from learning_funcs import filter_features, calculate_and_save_model_output, set_up_PC_cluster_plot, create_legend
@@ -18,20 +18,13 @@ from learning_funcs import filter_features, calculate_and_save_model_output, set
 # ------------------------------------------
 # Select data file name and folder location
 # ------------------------------------------
-# Data for model generation
-file_loc = 'C:\Drive\Video Analysis\data\\'
-date = 'baseline_analysis\\'
-mouse_session = 'together_for_model\\'
-save_vid_name = 'all'
-model_file_loc = file_loc + date + mouse_session + save_vid_name
+file_location = 'C:\Drive\Video Analysis\data\\'
+data_folder = 'baseline_analysis\\'
+analysis_folder = 'together_for_model\\'
 
-# Data to visualize fit
-file_loc = 'C:\Drive\Video Analysis\data\\baseline_analysis\\'
-date = '27.02.2018\\'
-mouse_session = '205_1a\\'
-save_vid_name = 'normal_1_0'
-fit_file_loc = file_loc + date + mouse_session + save_vid_name
-
+concatenated_data_name_tag = 'analyze3' 
+model_name_tag = '15_4'
+# 11 is 3PCs, 14, 15, 16 are 4,5,6 PCs; 15nt, 18nt for no turn
 
 # ---------------------------
 # Select analysis parameters
@@ -41,23 +34,23 @@ model_type = 'hmm' #hmm or gmm
 num_clusters = 4 #number of poses
 num_PCs_used = 4 #number of PCs used as features
 add_velocity = True #include velocity as a pseudo-PC
-
-vel_scaling_factor = 1 #scale down velocity's importance relative to PC1
 add_turn = True
+vel_scaling_factor = .5 #scale down velocity's importance relative to PC1
+turn_scaling_factor = .75 #scale down velocity's importance relative to PC1
 
 
 # Trajectory Settings
-model_sequence = False
+model_sequence = True
 if model_sequence:
-    window_size = 4 #frames
-    windows_to_look_at = 2
+    window_size = 10 #frames
+    windows_to_look_at = 1
 else:
     window_size, windows_to_look_at = 0,0
 
 # Smoothing Settings
 filter_data_for_model = True
-filter_length = 5 # total width of gaussian smoothing
-sigma = 2 #standard deviation in frames of gaussian filter
+filter_length = 3 # half-width of gaussian smoothing
+sigma = 2 # standard deviation in frames of gaussian filter
 
 
 # --------------------------------
@@ -73,7 +66,7 @@ tol = .001 # how low of an error needed to end model improvement
 # Misc Settings
 plot_result = True
 num_PCs_shown = 3
-seed = 1
+seed = 3
 show_unchosen_cluster = .15 #if unchosen cluster has this proportion responsibility, plot it too
 do_not_overwrite = False
 
@@ -86,32 +79,71 @@ do_not_overwrite = False
 # -------------------
 # Load relevant data
 # -------------------
-velocity = np.load(model_file_loc + '_velocity.npy')
-speed_only = True #recommended
-add_change = False #not recommended
-try:
-    disruptions = np.load(model_file_loc + '_disruption.npy')
-except:
-    disruptions = []
+print('preparing data...')
+file_location_concatenated_data = file_location + data_folder + analysis_folder + concatenated_data_name_tag + '\\' + concatenated_data_name_tag  
+if os.path.isfile(file_location_concatenated_data + '_position_orientation_velocity_corrected.npy'):
+    position_orientation_velocity = np.load(file_location_concatenated_data + '_position_orientation_velocity_corrected.npy')
+else:
+    position_orientation_velocity = np.load(file_location_concatenated_data + '_position_orientation_velocity.npy')
+    print('loaded non-flip-corrected data')
 
-pca_coeffs = np.load(model_file_loc + '_pca_coeffs.npy')
-
+pca_coeffs = np.load(file_location_concatenated_data + '_pca_coeffs.npy')
 
 data_for_model = pca_coeffs[:,0:num_PCs_used]
+
 #modify saved file names depending on type of clustering:
 if model_sequence: 
-    suffix = '_seq'
+    suffix = '_seq' + model_name_tag
 else:
-    suffix = ''
+    suffix =  model_name_tag 
 
 
 # --------------------------------
 # Include velocity as a pseudo-PC
 # --------------------------------
+max_pc = np.max(data_for_model)
+out_of_bounds = position_orientation_velocity[:,1]
+trials_to_analyze_index = out_of_bounds==0 #not sheltered or out of bounds
+disruptions = np.ones(len(out_of_bounds)).astype(bool)
+disruptions[1:] = np.not_equal(out_of_bounds[1:],out_of_bounds[:-1])
+disruptions = disruptions[trials_to_analyze_index]
+
+
 if add_velocity:
-    if add_change: #if using add_change, then apply speed_only
-        speed_only = True
-    data_for_model = add_velocity_as_feature(data_for_model, speed_only, add_turn, velocity, vel_scaling_factor,disruptions)
+    speed = position_orientation_velocity[trials_to_analyze_index,2:3]**2 + position_orientation_velocity[trials_to_analyze_index,3:4]**2 #speed
+    
+    speed[disruptions==1,0] = np.mean(speed[disruptions==0,0]) #remove spurious velocities
+    mean_speed = np.mean(speed[:])
+    std_speed = np.std(speed[:])
+    speed[speed[:,0]-mean_speed > 3*std_speed,0] = mean_speed + 3*std_speed #clip spurious speeds
+    
+    speed_for_model = (speed-np.mean(speed)) / np.max(speed) * max_pc / vel_scaling_factor
+   
+    
+    data_for_model = np.append(data_for_model,speed_for_model,axis=1)
+
+# ----------------------------------------
+# Include angular velocity as a pseudo-PC
+# ----------------------------------------
+if add_turn:
+           
+    head_turn_for_model = np.zeros((data_for_model.shape[0],1))
+    head_direction = position_orientation_velocity[trials_to_analyze_index,4:5]
+    last_head_direction = head_direction[:-1,:]
+    current_head_direction = head_direction[1:,:]
+    head_turn = np.min(np.concatenate( ( abs(current_head_direction - last_head_direction), abs(360-abs(current_head_direction - last_head_direction)) ),axis=1),axis=1)
+    head_turn[head_turn > 180] = abs(360 - head_turn[head_turn > 180]) #algorithmic flips dont count
+    head_turn[head_turn > 90] = abs(180 - head_turn[head_turn > 90])
+    head_turn[head_turn > 15] = 15 #clip head turn
+    head_turn[disruptions[1:]] = 0
+
+    head_turn = (head_turn - np.mean(head_turn)) / np.max(head_turn) * max_pc / turn_scaling_factor
+    
+    head_turn_for_model[1:,0] = head_turn
+    if filter_data_for_model: #double filter this particularly choppy feature
+        head_turn_for_model = filter_features(head_turn_for_model, filter_length, sigma)
+    
+    data_for_model = np.append(data_for_model,head_turn_for_model,axis=1)
 
 # -------------------------------------
 # Smooth features going into the model
@@ -120,11 +152,7 @@ if filter_data_for_model:
     data_for_model = filter_features(data_for_model, filter_length, sigma) #apply gaussian smoothing
 
 
-# --------------------------------------
-# Include change in pose as a pseudo-PC
-# --------------------------------------
-if add_change:
-    data_for_model = add_pose_change_as_feature(data_for_model, vel_scaling_factor, num_PCs_used)  
+ 
     
 data = data_for_model #use this for the model, unless modeling sequence
 
@@ -141,8 +169,8 @@ if model_sequence:  #add feature chunks preceding and following the frame in que
 # -------------
 # Save settings
 # -------------  
-np.save(model_file_loc + '_' + model_type + '_settings' + suffix + '.npy',  #save settings
-        [add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at, np.max(data_for_model)])
+np.save(file_location_concatenated_data + '_' + model_type + '_settings' + suffix + '.npy',  #save settings
+        [add_velocity, True, False, add_turn, num_PCs_used, window_size, windows_to_look_at, np.max(data_for_model)])
 
 
 
@@ -175,12 +203,10 @@ elif model_type == 'gmm':
 # ---------------------------
 print('fitting model...')
 model.fit(data)   #fit model
-save_file_model = model_file_loc + '_' + model_type + suffix #save model
+save_file_model = file_location_concatenated_data + '_' + model_type + suffix #save model
 if os.path.isfile(save_file_model) and do_not_overwrite:
     raise Exception('File already exists') 
 joblib.dump(model, save_file_model)
-
-
 
 
 #%% -------------------------------------------------------------------------------------------------------------------------------------
@@ -191,28 +217,27 @@ if plot_result:
     # -------------------------------
     # Calculate and save model output
     # -------------------------------
-    calculate_and_save_model_output(data, model, num_clusters, fit_file_loc, model_type, suffix, do_not_overwrite)
-    
+    calculate_and_save_model_output(data, model, num_clusters, file_location_concatenated_data, model_type, suffix, do_not_overwrite)
     
     plt.close('all')
     #reload relevant data
-    components_binary = np.load(fit_file_loc + '_components_binary' + suffix + '.npy')
-    unchosen_components_binary = np.load(fit_file_loc + '_unchosen_components_binary' + suffix + '.npy')
-    unchosen_probabilities = np.load(fit_file_loc + '_unchosen_probabilities' + suffix + '.npy')
+    components_binary = np.load(file_location_concatenated_data + '_components_binary' + suffix + '.npy')
+    unchosen_components_binary = np.load(file_location_concatenated_data + '_unchosen_components_binary' + suffix + '.npy')
+    unchosen_probabilities = np.load(file_location_concatenated_data + '_unchosen_probabilities' + suffix + '.npy')
     
     # set up plot
     plot_colors = ['red','deepskyblue','green','blueviolet','saddlebrown','lightpink','yellow','white']
-    set_up_PC_cluster_plot(figsize=(30,10), xlim=[0,2000])
+    set_up_PC_cluster_plot(figsize=(30,10), xlim=[0,1000])
     
     # plot PCs
     data_for_model_normalized = data_for_model / np.max(data_for_model) #set max to 1 for visualization purposes
-    np.save(fit_file_loc+'_data_for_' + model_type + '_normalized', data_for_model_normalized)
+    np.save(file_location_concatenated_data+'_data_for_' + model_type + '_normalized', data_for_model_normalized)
     plt.plot(data_for_model_normalized[:,0:num_PCs_shown])
     
     # plot velocity and/or pose change
     if add_velocity:
-        plt.plot(data_for_model_normalized[:,-2-add_change+speed_only-add_turn], color = 'k',linewidth=2) #plot speed
-        if not(speed_only) or add_change or add_turn: #plot turn speed or, if available, pose change
+        plt.plot(data_for_model_normalized[:,-1-add_turn], color = 'k',linewidth=2) #plot speed
+        if add_turn: #plot turn speed
             plt.plot(data_for_model_normalized[:,-1], color = 'gray', linestyle = '--',linewidth=2)
       
     # plot raster of clusters above PCs
@@ -225,6 +250,6 @@ if plot_result:
         plt.scatter(unchosen_component_frames,np.ones(len(unchosen_component_frames))*.95,color=plot_colors[n],alpha=.4,marker='|',s=700)
     
     # Create legend
-    legend_entries = create_legend(num_PCs_shown, add_velocity, speed_only, add_change, add_turn)
+    legend_entries = create_legend(num_PCs_shown, add_velocity, True, False, add_turn)
     
 
