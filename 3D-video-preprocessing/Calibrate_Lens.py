@@ -33,7 +33,6 @@ light_threshold = [65, 60, 55, 52, 47, 45, 42, 40, 37, 35, 32, 30, 28, 27, 25]
 dark_threshold =  [30, 30, 30, 30, 30, 25, 25, 25, 20, 20, 15, 15, 15, 15, 15]
 
 
-
 # -------------------------
 # Find checkerboard corners
 # -------------------------
@@ -62,7 +61,7 @@ for fname in images:
         
         calib_image[calib_image<dark_threshold[i]] = 0
         calib_image[calib_image>light_threshold[i]] = 250
-        
+
         cv2.imshow('calibration image',calib_image)
         if cv2.waitKey(50) & 0xFF == ord('q'):
             break
@@ -123,11 +122,12 @@ K=np.array(K)
 D=np.array(D)
 for img_path in glob.glob(file_loc + '*.png'):
     img = cv2.imread(img_path)
+    
+    
     h,w = img.shape[:2]
     map1, map2 = cv2.fisheye.initUndistortRectifyMap(K, D, np.eye(3), K, DIM, cv2.CV_16SC2)
     undistorted_img = cv2.remap(img, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
-    cv2.imshow("correction", img)
-    cv2.waitKey(2500)
+
     
     dim1 = img.shape[:2][::-1]  #dim1 is the dimension of input image to un-distort
     assert dim1[0]/dim1[1] == DIM[0]/DIM[1], "Image to undistort needs to have same aspect ratio as the ones used in calibration"
@@ -138,8 +138,13 @@ for img_path in glob.glob(file_loc + '*.png'):
     new_K = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(K, D, dim2, np.eye(3), balance=1)
     map1, map2 = cv2.fisheye.initUndistortRectifyMap(K, D, np.eye(3), new_K, dim3, cv2.CV_16SC2)
     undistorted_img = cv2.remap(img, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+    
+    
+    cv2.imshow("correction", img)
+    if cv2.waitKey(500) & 0xFF == ord('q'):
+       break 
     cv2.imshow('correction', undistorted_img)
-    if cv2.waitKey(2500) & 0xFF == ord('q'):
+    if cv2.waitKey(500) & 0xFF == ord('q'):
        break 
    
 # save maps to use in analysis!
@@ -147,8 +152,7 @@ for img_path in glob.glob(file_loc + '*.png'):
 maps = np.zeros((calib_image.shape[0],calib_image.shape[1],3)).astype(int16)
 maps[:,:,0:2] = map1
 maps[:,:,2] = map2
-np.save(file_loc + 'fisheye_maps_' + camera + '.npy', maps)
-
+#np.save(file_loc + 'fisheye_maps_' + camera + '.npy', maps)
 
 
 

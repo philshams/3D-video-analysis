@@ -10,7 +10,11 @@
 #%% -------------------------------------------------------------------------------------------------------------------------------------
 #------------------------                       Pre-process scrap                 --------------------------------------
 #-----------------------------------------------------------------------------------------------------------------------------------------
- 
+#         except:
+#            out_of_bounds_cur = np.load(file_location_saved_data + '_out_of_bounds.npy')
+#            out_of_bounds_new = np.zeros((len(out_of_bounds_cur),2))
+#            out_of_bounds_new[:,0] = out_of_bounds_cur
+#            np.save(file_location_saved_data + '_out_of_bounds.npy', out_of_bounds_new)
 #time audit
 
 #t0 = time.time() #get time
@@ -176,6 +180,51 @@
 #-----------------------------------------------------------------------------------------------------------------------------------------
 
     
+
+''' -------------------------------------------------------------------------------------------------------------------------------------
+# ------------------------              Plot PCs and Clusters over Time                            --------------------------------------
+# --------------------------------------------------------------------------------------------------------------------------------------'''
+
+#if plot_result:
+#
+#
+#    plt.close('all')
+#    # reload relevant data
+#    components_binary = np.load(file_location_data_library + '_components_binary_' + model_type_and_name_tag + '.npy')
+#    unchosen_components_binary = np.load(
+#        file_location_data_library + '_unchosen_components_binary_' + model_type_and_name_tag + '.npy')
+#    unchosen_probabilities = np.load(file_location_data_library + '_unchosen_probabilities_' + model_type_and_name_tag + '.npy')
+#
+#    # set up plot
+#    plot_colors = ['red', 'deepskyblue', 'green', 'blueviolet', 'saddlebrown', 'lightpink', 'yellow', 'white']
+#    set_up_PC_cluster_plot(figsize=(30, 10), xlim=[0, 1000])
+#
+#    # plot PCs
+#    data_for_model_normalized = data_for_model / np.max(data_for_model)  # set max to 1 for visualization purposes
+#    np.save(file_location_data_library + '_data_for_' + model_type + '_normalized', data_for_model_normalized)
+#    plt.plot(data_for_model_normalized[:, 0:num_PCs_shown])
+#
+#    # plot velocity and/or pose change
+#    if use_speed_as_pseudo_PC:
+#        plt.plot(data_for_model_normalized[:, -1 - use_angular_speed_as_pseudo_PC], color='k', linewidth=2)  # plot speed
+#        if use_angular_speed_as_pseudo_PC:  # plot turn speed
+#            plt.plot(data_for_model_normalized[:, -1], color='gray', linestyle='--', linewidth=2)
+#
+#    # plot raster of clusters above PCs
+#    for n in range(num_clusters):
+#        # plot chosen pose:
+#        component_frames = np.where(components_binary[:, n])[0]
+#        plt.scatter(component_frames, np.ones(len(component_frames)) * 1, color=plot_colors[n], alpha=.7, marker='|',
+#                    s=700)
+#        # plot 2nd-place pose:
+#        unchosen_component_frames = np.where(unchosen_components_binary[:, n] * \
+#                                             (unchosen_probabilities > show_unchosen_cluster))[0]
+#        plt.scatter(unchosen_component_frames, np.ones(len(unchosen_component_frames)) * .95, color=plot_colors[n],
+#                    alpha=.4, marker='|', s=700)
+#
+#    # Create legend
+#    legend_entries = create_legend(num_PCs_shown, use_speed_as_pseudo_PC, True, False, use_angular_speed_as_pseudo_PC)
+
     
     #super-clustter pie chart
     

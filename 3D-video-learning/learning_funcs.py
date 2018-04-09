@@ -34,72 +34,6 @@ def reconstruct_from_wavelet(wavelet_array,coeff_slices, level, discard_scale):
     return reconstruction_from_wavelet 
 
 
-#%% ----------------------------------------------------------------------------------------------------------------------------------
-def add_velocity_as_feature(data_for_model, speed_only, add_turn, velocity, vel_scaling_factor, disruptions):
-    
-    velocity[disruptions==1,0:2] = 0
-    #find 6 stdev, throw out those beyond that as spurious
-    mean_vel = np.mean(velocity[:,0:2],axis=0)
-    std_vel = np.std(velocity[:,0:2],axis=0)
-    velocity[abs(velocity[:,0]-mean_vel[0]) > 8*std_vel[0],0:2] = mean_vel[0] + 8*std_vel[0]
-    velocity[abs(velocity[:,1]-mean_vel[1]) > 8*std_vel[1],0:2] = mean_vel[1] + 8*std_vel[1]
-    
-    max_vel = np.max(abs(velocity[:,0:2]))
-    max_pc = np.max(data_for_model)
-    
-    if not speed_only: #get forward and turn velocity
-        velocity_for_model = np.zeros((data_for_model.shape[0],2))
-        velocity_for_model[:,:] = velocity[:,0:2] / max_vel * max_pc / vel_scaling_factor
-        velocity_for_model[:,1] = np.abs(velocity_for_model[:,1]) - np.mean(np.abs(velocity_for_model[:,1]))  #zero-center data
-        velocity_for_model[disruptions==1,:] = 0
-                
-    if speed_only: #just get velocity magnitude (speed)
-        speed_for_model = np.zeros((data_for_model.shape[0],1))
-        speed_for_model[:,0] = np.nan_to_num(np.sqrt(velocity[:,0]**2 + velocity[:,1]**1))
-        
-        speed_for_model[speed_for_model > 30] = 0 
-        velocity_for_model = speed_for_model - np.mean(speed_for_model) #zero-center data
-        
-        max_speed = np.max(abs(velocity_for_model))
-        velocity_for_model = velocity_for_model / max_speed * max_pc / vel_scaling_factor
-        velocity_for_model[disruptions==1,:] = 0
-        
-    if add_turn and speed_only:
-        velocity_and_turn_for_model = np.zeros((data_for_model.shape[0],2))
-        velocity_and_turn_for_model[:,0] = np.squeeze(velocity_for_model)
-        
-        last_head_direction = velocity[:-1,2:4]
-        next_head_direction = velocity[1:,2:4]
-        head_turn = np.nan_to_num(np.arccos(np.sum(last_head_direction * next_head_direction, axis=1)))
-        head_turn[head_turn > np.pi/2] = 0 #spurious
-        head_turn[head_turn > np.pi/12] = np.pi/12 #somewhat spurious
-        head_turn = head_turn / (np.pi/12) * max_pc / vel_scaling_factor
-        
-        velocity_and_turn_for_model[:-1,1] = head_turn
-        velocity_for_model = velocity_and_turn_for_model
-        
-    if add_turn and not speed_only:
-        print('please turn off either add_turn or speed_only')
-
-    #append the appropriate velocity array to PCs    
-    data_for_model = np.append(data_for_model,velocity_for_model,axis=1)
-    
-    return data_for_model
-    
-
-#%% ----------------------------------------------------------------------------------------------------------------------------------
-def add_pose_change_as_feature(data_for_model, vel_scaling_factor, num_PCs_used):
-    max_pc = np.max(data_for_model)
-    
-    ch_ch_ch_ch_changes = np.zeros((data_for_model.shape[0],1))
-    ch_ch_ch_ch_changes[:,0] = np.append(0,  #just the norm of the difference in PC space of consecutive frames
-        np.linalg.norm(data_for_model[1:,0:num_PCs_used] - data_for_model[:-1,0:num_PCs_used],axis=1))
-    ch_ch_ch_ch_changes = ch_ch_ch_ch_changes - np.mean(ch_ch_ch_ch_changes)
-    max_change = np.max(ch_ch_ch_ch_changes)
-    ch_ch_ch_ch_changes = ch_ch_ch_ch_changes / max_change * max_pc / vel_scaling_factor
-    #append the change array to PCs and velocity
-    data_for_model = np.append(data_for_model,ch_ch_ch_ch_changes,axis=1)
-    return data_for_model
 
 
 #%% ----------------------------------------------------------------------------------------------------------------------------------
@@ -108,27 +42,14 @@ def filter_features(data_for_model, filter_length, sigma):
     gauss_filter = gauss_filter / sum(gauss_filter) # normalize filter
 
     data_to_filter_model = np.zeros(data_for_model.shape)
-    for pc in range(data_for_model.shape[1]): # apply filter to each feature
-
+    for pc in range(data_for_model.shape[1]): # apply filter to each ; must be 2D array
+        # pad with mirror image
         array_to_filter=np.r_[data_for_model[filter_length:0:-1,pc],data_for_model[:,pc],data_for_model[-1:-filter_length-1:-1,pc]]
         data_to_filter_model[:,pc] = np.convolve(array_to_filter,gauss_filter,mode='valid')        
 
     data_for_model = data_to_filter_model
     return data_for_model
 
-#def smooth(x,window_len=11,window='hanning'):
-#    """smooth the data using a window with requested size."""
-#    
-#    s=np.r_[x[window_len-1:0:-1],x,x[-2:-window_len-1:-1]]
-#
-#    if window == 'flat': #moving average
-#        w=np.ones(window_len,'d')
-#    else:
-#        w=eval('np.'+window+'(window_len)')
-#
-#    y=np.convolve(w/w.sum(),s,mode='valid')
-#    return y
-#
 
 
 #%% ----------------------------------------------------------------------------------------------------------------------------------
@@ -151,16 +72,93 @@ def create_sequential_data(data_for_model, window_size, windows_to_look_at):
     return data_to_concatenate_sequence
 
 
+#%% --------------------------------------------------------------------------------------------------------------------
+def prepare_data_for_model(pca_coeffs, num_PCs_used, position_orientation_velocity, disruptions, \
+                           vel_scaling_factor, turn_scaling_factor, use_speed_as_pseudo_PC, use_angular_speed_as_pseudo_PC, \
+                           filter_data_for_model, filter_length, sigma, model_sequence, window_size, windows_to_look_at):
+        
+    data_for_model = pca_coeffs[:, 0:num_PCs_used]
+    # --------------------------------
+    # Include velocity as a pseudo-PC
+    # --------------------------------
+    max_pc = np.max(data_for_model)
+    
+    if use_speed_as_pseudo_PC:
+        speed = position_orientation_velocity[:, 2:3] ** 2 + \
+                position_orientation_velocity[:,3:4] ** 2  # speed
+        
+        # remove spurious velocities
+        speed[disruptions == 1,0] = np.mean(speed[disruptions == 0,0])  
+    
+        # clip outlier speeds
+        mean_speed = np.mean(speed[:])
+        std_speed = np.std(speed[:])
+        speed[speed[:, 0] - mean_speed > 3 * std_speed, 0] = mean_speed + 3 * std_speed  
+        
+        # rescale speed
+        speed_for_model = (speed - np.mean(speed)) / np.max(speed) * max_pc / vel_scaling_factor
+    
+        # append speed to the rest of the features
+        data_for_model = np.append(data_for_model, speed_for_model, axis=1)
+    
+    # ----------------------------------------
+    # Include angular velocity as a pseudo-PC
+    # ----------------------------------------
+    if use_angular_speed_as_pseudo_PC:
+        # get head direction data
+        angular_speed_for_model = np.zeros((data_for_model.shape[0], 1))
+        head_direction = position_orientation_velocity[:, 4:5]
+        last_head_direction = head_direction[:-1, :]; current_head_direction = head_direction[1:, :]
+    
+        # compute angular speed from head direction data
+        angular_speed = np.min(np.concatenate((abs(current_head_direction - last_head_direction),
+                                           abs(360 - abs(current_head_direction - last_head_direction))), axis=1), axis=1)
+    
+        # assume that very large turns in a single frame are spurious, and clip outliers
+        angular_speed[angular_speed > 180] = abs(360 - angular_speed[angular_speed > 180])
+        angular_speed[angular_speed > 90] = abs(180 - angular_speed[angular_speed > 90])
+        angular_speed[angular_speed > 15] = 15
+        angular_speed[disruptions[1:]] = 0
+    
+        # rescale angular speed
+        angular_speed = (angular_speed - np.mean(angular_speed)) / np.max(angular_speed) * max_pc / turn_scaling_factor
+        angular_speed_for_model[1:, 0] = angular_speed
+    
+        # double filter this particularly choppy feature
+        if filter_data_for_model:
+            angular_speed_for_model = filter_features(angular_speed_for_model, filter_length, sigma)
+    
+        # append angular speed to the rest of the features
+        data_for_model = np.append(data_for_model, angular_speed_for_model, axis=1)
+    
+    # -------------------------------------
+    # Smooth features going into the model
+    # -------------------------------------
+    if filter_data_for_model:
+        data_for_model = filter_features(data_for_model, filter_length, sigma)  # apply gaussian smoothing
+    data = data_for_model  # use this for the model, unless modeling sequence
+    
+    # ------------------------------------------------
+    # Create array of moving-window-chunked sequences
+    # ------------------------------------------------
+    if model_sequence:  # add feature chunks preceding and following the frame in question
+        data_for_model_sequence = create_sequential_data(data_for_model, window_size, windows_to_look_at)
+        data = data_for_model_sequence  # use this for the model, if modeling sequence
+        
+    return data
+
+
+
 #%% ----------------------------------------------------------------------------------------------------------------------------------
 def calculate_and_save_model_output(data, model, num_clusters, file_loc, model_type, suffix, do_not_overwrite):
     
     #get probabilities of being in each cluster at each frame
     probabilities = model.predict_proba(data)
-    np.save(file_loc+'_probabilities' + suffix, probabilities)
+    np.save(file_loc+'_probabilities_' + suffix, probabilities)
     
     #get which cluster is chosen at each frame
     chosen_components = model.predict(data)
-    np.save(file_loc+'_chosen_components' + suffix,chosen_components)
+    np.save(file_loc+'_chosen_components_' + suffix,chosen_components)
     
     #get which cluster is 2nd most likely to be chosen at each frame, and probabilities just for that cluster
     unchosen_probabilities = probabilities # initialize array
@@ -168,7 +166,7 @@ def calculate_and_save_model_output(data, model, num_clusters, file_loc, model_t
         unchosen_probabilities[chosen_components==i,i]=0 
     unchosen_components = np.argmax(unchosen_probabilities,axis=1) #take the max probability among remaining options
     unchosen_probabilities = np.max(unchosen_probabilities,axis=1) #and report its probability
-    np.save(file_loc+'_unchosen_probabilities' + suffix,unchosen_probabilities)
+    np.save(file_loc+'_unchosen_probabilities_' + suffix,unchosen_probabilities)
     
     #get binarized version of chosen_components and unchosen_components, for later analysis
     components_binary = np.zeros((data.shape[0],num_clusters)) #initialize frames x num_clusters array
@@ -176,8 +174,11 @@ def calculate_and_save_model_output(data, model, num_clusters, file_loc, model_t
     for n in range(num_clusters): #fill with 1 (in that cluster) or 0 (in another cluster)
         components_binary[:,n] = (chosen_components == n)
         unchosen_components_binary[:,n] = (unchosen_components == n)
-    np.save(file_loc+'_components_binary' + suffix,components_binary)
-    np.save(file_loc+'_unchosen_components_binary' + suffix,unchosen_components_binary)
+    np.save(file_loc+'_components_binary_' + suffix,components_binary)
+    np.save(file_loc+'_unchosen_components_binary_' + suffix,unchosen_components_binary)
+    
+    data_for_model_normalized = data / np.max(data)  # set max to 1 for visualization purposes
+    np.save(file_loc + '_data_for_' + model_type + '_normalized', data_for_model_normalized)
 
 
 #%% ----------------------------------------------------------------------------------------------------------------------------------
@@ -208,6 +209,25 @@ def set_up_PC_cluster_plot(figsize, xlim):
     plt.ylim([-1.05,1.05])
     return rolling_fig
 
+
+#%% ----------------------------------------------------------------------------------------------------------------------------------
+def make_color_array(colors, trajectory_pose_size):
+    color_array = np.zeros((trajectory_pose_size, trajectory_pose_size, 3, len(colors)))  # create coloring arrays
+    for c in range(len(colors)):
+        for i in range(3):  # B, G, R
+            color_array[:, :, i, c] = np.ones((trajectory_pose_size, trajectory_pose_size)) * colors[c][i] / sum(
+                colors[c])
+    return color_array
+
+#%% ----------------------------------------------------------------------------------------------------------------------------------
+def get_trajectory_indices(windows_to_look_at):
+    trajectory_position = [windows_to_look_at]  # get indices to put the various clusters in the right order, below
+    offset = 1
+    for i in range(2 * windows_to_look_at):
+        trajectory_position.append(windows_to_look_at + offset * (i % 2 == 1) - + offset * (i % 2 == 0))
+        if (i % 2 == 1):
+            offset += 1
+    return trajectory_position
 
 #%% ----------------------------------------------------------------------------------------------------------------------------------
 def cross_validate_model(data_for_cross_val, model_type, K_range, seed_range, num_components_range, tol):
@@ -340,3 +360,4 @@ def get_biggest_contour(frame):
     cy = int(M['m01']/M['m00'])        
     
     return contours, big_cnt_ind, cx, cy, cnt
+

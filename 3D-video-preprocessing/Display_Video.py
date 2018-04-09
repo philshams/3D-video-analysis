@@ -12,15 +12,13 @@ import cv2
 # Select video file name and folder location
 # ------------------------------------------
 file_name = 'normal_1_0_data.avi' #
-#file_loc = 'C:\Drive\Video Analysis\data\\'
-#date = '14.03.2018_zina\\' #
-#mouse_session = 'test_video\\'  #
-file_loc = 'C:\\Drive\\Video Analysis\\data\\baseline_analysis\\together_for_model\\normal_1_0\\'
 
-#time = np.load(file_loc + 'ay117b_test1_timestamps.npy')
-print(file_loc)
+file_loc = 'C:\\Drive\\Video Analysis\\data\\baseline_analysis\\test_pipeline\\normal_1\\'
+file_loc = 'C:\\Drive\\Video Analysis\\data\\baseline_analysis\\27.02.2018\\205_1a\\'
 
-display_frame_rate = 10
+
+
+display_frame_rate = 100
 start_frame = 700
 end_frame = 10000
 

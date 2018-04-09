@@ -10,7 +10,8 @@ import cv2;
 from matplotlib import pyplot as plt;
 from mpl_toolkits.mplot3d import Axes3D;
 import os
-from learning_funcs import reconstruct_from_wavelet, make_color_array, get_trajectory_indices;
+from learning_funcs import reconstruct_from_wavelet;
+import sys; import glob
 from sklearn.externals import joblib
 from learning_funcs import set_up_PC_cluster_plot, create_legend
 
@@ -24,14 +25,14 @@ from learning_funcs import set_up_PC_cluster_plot, create_legend
 # ------------------------------------------
 # Select model directory
 save_folder_location = "C:\\Drive\\Video Analysis\\data\\baseline_analysis\\test_pipeline\\"
-data_library_name_tag = 'streamlined'
+data_library_name_tag = 'analyze'
 
 
 # Select session directory and video to display
-session_name_tag = 'loom_1'
+session_name_tag = 'normal_1'
 session_video_folder = 'C:\\Drive\\Video Analysis\\data\\baseline_analysis\\27.02.2018\\205_1a\\'
 session_video = session_video_folder + 'Chronic_Mantis_stim-default-996386-video-0.avi'
-video_num = 0
+
 
 
 # --------------------------------
@@ -41,15 +42,14 @@ model_type = 'hmm'
 model_name_tag = '4PC'
 model_sequence = False
 
+only_see = True; only_see_component = 3
 
-
-only_see = False; only_see_component = 3
-
-start_frame = 3000; stop_frame = 40000
+start_frame = 10; stop_frame = 40000
 frame_rate = 1000
 
 show_3D_PC_trajectory = False; show_all_3D_PC_data_at_once = False
-show_moving_features_plot = True
+show_moving_features_plot = True; show_shelter = True
+
 
 
 
@@ -73,9 +73,14 @@ show_moving_features_plot = True
 # ----------
 # Find data
 # ----------
+print('preparing data...')
 folder_location_data_library = save_folder_location + data_library_name_tag + '\\'
 file_location_data_library = folder_location_data_library + data_library_name_tag
-file_location_data_cur = save_folder_location + session_name_tag + '\\' + session_name_tag
+file_location_saved_data = save_folder_location + session_name_tag + '\\' + session_name_tag + '0_data.avi'
+
+#find which session the one listed above is, numerically
+session_name_tags = np.load(folder_location_data_library + '_session_name_tags.npy')
+session_num = np.where(session_name_tags == session_name_tag)[0]
 
 # open the video for that session
 mouse_vid = cv2.VideoCapture(session_video)
@@ -85,51 +90,72 @@ mouse_vid = cv2.VideoCapture(session_video)
 # load model data
 # ----------------
 if model_sequence:  # modify saved file names depending on type of clustering:
-    model_type_and_name_tag = 'seq_' + model_name_tag
+    model_type_and_name_tag = '_seq' + model_name_tag
 else:
     model_type_and_name_tag = model_name_tag
-    
-file_location_data_cur = save_folder_location + session_name_tag + '\\' + session_name_tag
 
-data_for_model_normalized = np.load(file_location_data_cur+ '_data_for_' + model_type + '_normalized.npy')
-chosen_components = np.load(file_location_data_cur+ '_chosen_components_' + model_type_and_name_tag + '.npy')
-components_binary = np.load(file_location_data_cur+ '_components_binary_' + model_type_and_name_tag + '.npy')
-unchosen_components_binary = np.load(file_location_data_cur+ '_unchosen_components_binary_' + model_type_and_name_tag + '.npy')
-probabilities = np.load(file_location_data_cur+ '_probabilities_' + model_type_and_name_tag + '.npy')
-unchosen_probabilities = np.load(file_location_data_cur+ '_unchosen_probabilities_' + model_type_and_name_tag + '.npy')
+data_for_model_normalized = np.load(folder_location_data_library + '_data_for_' + model_type + '_normalized.npy')
+chosen_components = np.load(folder_location_data_library + '_chosen_components' + model_type_and_name_tag + '.npy')
+components_binary = np.load(folder_location_data_library + '_components_binary' + model_type_and_name_tag + '.npy')
+unchosen_components_binary = np.load(folder_location_data_library + '_unchosen_components_binary' + model_type_and_name_tag + '.npy')
+probabilities = np.load(folder_location_data_library + '_probabilities' + model_type_and_name_tag + '.npy')
+unchosen_probabilities = np.load(folder_location_data_library + '_unchosen_probabilities' + model_type_and_name_tag + '.npy')
 
 num_clusters = probabilities.shape[1]
-model = joblib.load(file_location_data_library + '_' + model_type + '_' + model_type_and_name_tag)  # load model
+model = joblib.load(folder_location_data_library + '_' + model_type + model_type_and_name_tag)  # load model
 
 add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at, feature_max = np.load(
-    file_location_data_library + '_' + model_type + '_settings_' + model_type_and_name_tag + '.npy')
+    folder_location_data_library + '_' + model_type + '_settings' + model_type_and_name_tag + '.npy')
 add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at = np.array(
     [add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at]).astype(int)
 
-# load transform info for reconstruction
-pca = joblib.load(file_location_data_library + '_pca')
-relevant_wavelet_features = np.load(file_location_data_library + '_relevant_wavelet_features_PCA.npy')
-coeff_slices = np.load(save_folder_location + 'wavelet_slices.npy')
-level = 5 ; discard_scale = 4  # these must be parameters taken from original wavelet transform
 
-# load position-orientation-velocity for session and out-of-bounds info
-if os.path.isfile(file_location_data_cur + '_position_orientation_velocity_corrected.npy'):
-    position_orientation_velocity = np.load(file_location_data_cur + '_position_orientation_velocity_corrected.npy')
+
+pca = joblib.load(folder_location_data_library + '_pca')  # load transform info for reconstruction
+relevant_ind = np.load(folder_location_data_library + '_wavelet_relevant_ind_PCA.npy')
+coeff_slices = np.load(folder_location_data_library + '_wavelet_slices.npy')
+level = 5  # these must be parameters taken from original wavelet transform
+discard_scale = 4
+
+if os.path.isfile(folder_location_data_library + '_position_orientation_velocity_corrected.npy'):
+    position_orientation_velocity = np.load(folder_location_data_library + '_position_orientation_velocity_corrected.npy')
 else:
-    position_orientation_velocity = np.load(file_location_data_cur + '_position_orientation_velocity.npy')
+    position_orientation_velocity = np.load(folder_location_data_library + '_position_orientation_velocity.npy')
     print('loaded non-flip-corrected data')
-video_index = position_orientation_velocity[:, 7] == video_num
-out_of_bounds = position_orientation_velocity[video_index, 1]
-frames = position_orientation_velocity[video_index, 0]
+
+session_index = position_orientation_velocity[:, 7] == session_num
+out_of_bounds = position_orientation_velocity[session_index, 1]
+frames = position_orientation_velocity[session_index, 0]
 frames = frames[out_of_bounds == 0]
 
-# show a picture of a shelter when the mouse enters the shelter
-try:
+#head_dir = position_orientation_velocity[:, 4]
+#vel_forward = position_orientation_velocity[:, 2]
+#vel_ortho = position_orientation_velocity[:, 3]
+#pos_x = position_orientation_velocity[:, 5]
+#pos_y = position_orientation_velocity[:, 6]
+#disruptions = np.ones(len(out_of_bounds)).astype(bool)
+#disruptions[1:] = np.not_equal(out_of_bounds[1:], out_of_bounds[:-1])
+
+if show_shelter:
     shelter = cv2.imread('C:\\Drive\\Video Analysis\\data\\calibration_images\\shelter\\shelter.png')
     shelter = cv2.resize(shelter, (450, 450))
-except:
-    shetler = np.zeros((450,450)).astype(np.uint8)
-    print('shelter image not found')
+
+if model_sequence:  # rinse and repeat for the sequence model, if applicable
+    chosen_components_seq = np.load(folder_location_data_library + '_chosen_components_seq' + str(model_name_tag) + '.npy')
+    components_binary_seq = np.load(folder_location_data_library + '_components_binary_seq' + str(model_name_tag) + '.npy')
+    unchosen_components_binary_seq = np.load(folder_location_data_library + '_unchosen_components_binary_seq' + str(model_name_tag) + '.npy')
+    probabilities_seq = np.load(folder_location_data_library + '_probabilities_seq' + str(model_name_tag) + '.npy')
+    unchosen_probabilities_seq = np.load(folder_location_data_library + '_unchosen_probabilities_seq' + str(model_name_tag) + '.npy')
+
+    num_clusters = probabilities_seq.shape[1]
+    add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at, feature_max = np.load(
+        folder_location_data_library + '_' + model_type + '_settings_seq' + str(model_name_tag) + '.npy')
+    add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at = np.array(
+        [add_velocity, speed_only, add_change, add_turn, num_PCs_used, window_size, windows_to_look_at]).astype(int)
+
+    num_clusters = probabilities_seq.shape[1]  # load model settings
+
+    model = joblib.load(folder_location_data_library + '_' + model_type + '_seq' + str(model_name_tag))
 
 ''' -------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------                            Plot Mean Poses                                  -----------------------------------
@@ -148,16 +174,25 @@ elif model_type == 'gmm':
 # Display mean trajectory or pose for each cluster
 # ------------------------------------------------
 # Set up colors
-colors = [[0, 0, 255], [169, 118, 14], [10, 205, 10], [160, 0, 120], [0, 80, 120], [170, 120, 220], [0, 140, 140], [100, 100, 100]] * 3
+colors = [[0, 0, 255], [169, 118, 14], [10, 205, 10], [160, 0, 120], [0, 80, 120], [170, 120, 220], [0, 140, 140],
+          [100, 100, 100]] * 3
 plot_colors = ['red', 'deepskyblue', 'green', 'blueviolet', 'orange', 'lightpink', 'yellow', 'white']
-trajectory_pose_size = 400 
-color_array = make_color_array(colors, trajectory_pose_size)
+trajectory_pose_size = 300
+
+color_array = np.zeros((trajectory_pose_size, trajectory_pose_size, 3, len(colors)))  # create coloring arrays
+for c in range(len(colors)):
+    for i in range(3):  # B, G, R
+        color_array[:, :, i, c] = np.ones((trajectory_pose_size, trajectory_pose_size)) * colors[c][i] / sum(colors[c])
 
 # Get the number of features used in model
 features_used = int(mean_features_model.shape[1] / (2 * windows_to_look_at + 1))
-trajectory_position = get_trajectory_indices(windows_to_look_at)
 
-
+trajectory_position = [windows_to_look_at]  # get indices to put the various clusters in the right order, below
+offset = 1
+for i in range(2 * windows_to_look_at):
+    trajectory_position.append(windows_to_look_at + offset * (i % 2 == 1) - + offset * (i % 2 == 0))
+    if (i % 2 == 1):
+        offset += 1
 
 # Plot the mean trajectory or pose:
 for n in range(num_clusters):
@@ -169,14 +204,15 @@ for n in range(num_clusters):
 
         # Reconstruct wavelet-transformed data from the PCs
         mean_wavelet_relevant_features = pca.inverse_transform(
-            np.append(mean_features[0:num_PCs_used], np.zeros(pca.n_components_ - num_PCs_used)))
+            np.append(mean_features[0:num_PCs_used], np.zeros(10 - num_PCs_used)))
         mean_wavelet = np.zeros(39 * 39)
-        mean_wavelet[relevant_wavelet_features] = mean_wavelet_relevant_features
+        mean_wavelet[relevant_ind] = mean_wavelet_relevant_features
         mean_wavelet_array = np.reshape(mean_wavelet, (39, 39))
 
         # Reconstruct image in pixel space from wavelet-transformed reconstruction
         reconstruction_from_wavelet = reconstruct_from_wavelet(mean_wavelet_array, coeff_slices, level, discard_scale)
-        reconstruction_image = cv2.resize(abs(reconstruction_from_wavelet).astype(np.uint8),(trajectory_pose_size, trajectory_pose_size))
+        reconstruction_image = cv2.resize(abs(reconstruction_from_wavelet).astype(np.uint8),
+                                          (trajectory_pose_size, trajectory_pose_size))
         reconstruction_image = cv2.cvtColor(reconstruction_image, cv2.COLOR_GRAY2BGR)
         reconstruction_image = (reconstruction_image * np.squeeze(color_array[:, :, :, n])).astype(np.uint8)
 
@@ -233,8 +269,19 @@ for n in range(num_clusters):
 # -----------------------------------------------------
 num_frames = int(mouse_vid.get(cv2.CAP_PROP_FRAME_COUNT))
 mouse_vid.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
-wavelet_array = np.load(save_folder_location + session_name_tag + '\\' + session_name_tag + '_wavelet_corrected.npy')
+# mouse_vid.set(cv2.CAP_PROP_POS_FRAMES,frames[start_frame])
+# depth_vid.set(cv2.CAP_PROP_POS_FRAMES,start_frame)
 
+if model_sequence:
+    components_binary_to_display = components_binary_seq
+    unchosen_components_binary_to_display = unchosen_components_binary_seq
+    unchosen_probabilities_to_display = unchosen_probabilities_seq
+    chosen_components_to_display = chosen_components_seq
+else:
+    components_binary_to_display = components_binary
+    unchosen_components_binary_to_display = unchosen_components_binary
+    unchosen_probabilities_to_display = unchosen_probabilities
+    chosen_components_to_display = chosen_components
 
 # -------------------------
 # Set up feature-space plot
@@ -251,14 +298,13 @@ if show_3D_PC_trajectory:
 
     for n in range(num_clusters):
         if show_all_3D_PC_data_at_once:
-            component_frames = np.where(components_binary[:, n])[0]
-            ax_3D.scatter(data_for_model_normalized[component_frames[::100], 0],
-                          data_for_model_normalized[component_frames[::100], 1],
-                          data_for_model_normalized[component_frames[::100], 2], color=plot_colors[n], alpha=.6)
-            
+            component_frames = np.where(components_binary_to_display[:, n])
+            ax_3D.scatter(data_for_model_normalized[component_frames, 0],
+                          data_for_model_normalized[component_frames, 1],
+                          data_for_model_normalized[component_frames, 2], color=plot_colors[n])
         ax_3D.scatter(mean_features_model_normalized[n, 0], mean_features_model_normalized[n, 1],
                       mean_features_model_normalized[n, 2], color=plot_colors[n], s=5000, alpha=.3)
-        plt.pause(.1)
+
     ax_3D.set_xlabel('PC1');
     ax_3D.set_ylabel('PC2');
     ax_3D.set_zlabel('PC3')
@@ -267,18 +313,30 @@ if show_3D_PC_trajectory:
 # ----------------------------
 # Set up moving features plot
 # ----------------------------
-# create coloring array
-color_array = make_color_array(colors, 450)
-
 if show_moving_features_plot:
     rolling_fig = set_up_PC_cluster_plot(figsize=(20, 7), xlim=[1500, 2500])
     ax_2D = rolling_fig.add_subplot(111)
 
-    # Now plot the raster of components of the chosen model (pose or sequence)
+    # create coloring array
+    color_array = np.zeros((450, 450, 3, len(colors)))
+    for c in range(len(colors)):
+        for i in range(3):  # B, G, R
+            color_array[:, :, i, c] = np.ones((450, 450)) * colors[c][i] / sum(colors[c])
+
+    # Plot the corresponding poses along y = 0 for sequence analysis
+    #    if model_sequence:
+    #        for n in range(probabilities.shape[1]):
+    #            component_frames = np.where(components_binary[:,n])
+    #            ax_2D.scatter(component_frames,np.ones(len(component_frames))*0,color=plot_colors[n],alpha=.5,marker='|',s=700)
+
+    # Now plot the components of the chosen model (pose or sequence)
     for n in range(num_clusters):
-        component_frames = np.where(components_binary[:, n])[0]
-        ax_2D.scatter(component_frames, np.ones(len(component_frames)) * 1, color=plot_colors[n], alpha=.7, marker='|',s=700)
-        unchosen_component_frames = np.where(unchosen_components_binary[:, n] * (unchosen_probabilities > show_unchosen_cluster))[0]
+        component_frames = np.where(components_binary_to_display[:, n])
+        ax_2D.scatter(component_frames, np.ones(len(component_frames)) * 1, color=plot_colors[n], alpha=.7, marker='|',
+                      s=700)
+
+        unchosen_component_frames = np.where(
+            unchosen_components_binary_to_display[:, n] * (unchosen_probabilities_to_display > show_unchosen_cluster))
         ax_2D.scatter(unchosen_component_frames, np.ones(len(unchosen_component_frames)) * .9, color=plot_colors[n],
                       alpha=.4, marker='|', s=700)
 
@@ -301,33 +359,50 @@ if show_moving_features_plot:
 # Show behaviour and 3D videos, with selected pose also shown 
 # ------------------------------------------------------------
 
+# j = min(np.where(frames>=start_frame - window_size*windows_to_look_at + 1))
+# i = int(frames[j])
+# i = start_frame - window_size*windows_to_look_at + 1 #is this right...
 i = start_frame - window_size * windows_to_look_at
 j = min(np.where(frames >= (start_frame - window_size * windows_to_look_at))[0])
 while True:
+    #    if out_of_bounds[i] == 0:
+    #        ret1, frame1 = depth_vid.read()
+    #    else:
+    #        chosen_color = [0,0,0]
 
-    ret, frame = mouse_vid.read()
+    ret2, frame2 = mouse_vid.read()
 
-    if ret:
+    if ret2:
         # Grab frame number, which cluster is active, and its corresponding color
         frame_num_mouse = int(mouse_vid.get(cv2.CAP_PROP_POS_FRAMES))
-        mouse_frame = frame[:, :, 0]
+        #        frame_num_depth = int(depth_vid.get(cv2.CAP_PROP_POS_FRAMES))
+
+        mouse_frame = frame2[:, :, 0]
 
         # Display data movie
         if out_of_bounds[i] == 0:  # mouse in arena
-            chosen_component = chosen_components[j]
-            wavelet_cur = wavelet_array[:,:,j]
-
+            chosen_component = chosen_components_to_display[j]
+            #            print('head direction: ' + str(head_dir[i]))
+            #            print('vel forward: ' + str(vel_forward[i]))
+            #            print('vel ortho: ' + str(vel_ortho[i]))
+            #            print('position: ' + str((pos_x[i], pos_y[i])))
+            #            if disruptions[i]:
+            #                print('disrupted')
+            #                print(i)
+            #            print('')
             if only_see and chosen_component != only_see_component:
                 j += 1
                 i = frame_num_mouse - window_size * windows_to_look_at + 1
                 continue
             chosen_color = colors[chosen_component]
 
-            reconstruction_from_wavelet  = reconstruct_from_wavelet(wavelet_cur,coeff_slices, level, discard_scale)
-            reconstruction_from_wavelet[reconstruction_from_wavelet > 255] = 255
-            reconstruction_from_wavelet = cv2.resize(abs(reconstruction_from_wavelet).astype(np.uint8),(450,450))
-            reconstruction_from_wavelet = cv2.cvtColor(reconstruction_from_wavelet, cv2.COLOR_GRAY2BGR)
-            reconstruction_from_wavelet = (reconstruction_from_wavelet * np.squeeze(color_array[:,:,:,chosen_component])).astype(np.uint8)
+            # Grab the images to be displayed
+            #            depth_frame = frame1[:,:,0]
+
+            # Resize and recolor images
+            #            depth_frame = cv2.resize(depth_frame,(450,450))
+            #            depth_frame = cv2.cvtColor(depth_frame, cv2.COLOR_GRAY2BGR)
+            #            depth_frame = (depth_frame * np.squeeze(color_array[:,:,:,chosen_component])).astype(np.uint8)
 
             # Move the PC / clusters plot to be centered at the current frame
             if show_moving_features_plot:
@@ -340,22 +415,29 @@ while True:
             if show_3D_PC_trajectory and not show_all_3D_PC_data_at_once:
                 ax_3D.scatter(data_for_model_normalized[j, 0], data_for_model_normalized[j, 1],
                               data_for_model_normalized[j, -1], color=plot_colors[chosen_component], s=100, alpha=.5)
-                plt.pause(0.01)
             j += 1
         else:
             chosen_color = [0, 0, 0]
-            reconstruction_from_wavelet = shelter
+        #            i = frame_num_mouse - window_size*windows_to_look_at + 1
+        #            continue
 
+        #        elif out_of_bounds[i] == 1: #mouse in shelter
+        #            depth_frame = shelter
+
+        # update current frame index
+        # j = frame_num_depth - window_size*windows_to_look_at + 1
         i = frame_num_mouse - window_size * windows_to_look_at + 1
+        if out_of_bounds[i - 1] != 0:
+            continue
 
         # Add colored circle and frame number to behaviour image
         mouse_frame = cv2.cvtColor(mouse_frame, cv2.COLOR_GRAY2BGR)
         cv2.circle(mouse_frame, (50, 50), radius=25, color=chosen_color, thickness=50)
         cv2.putText(mouse_frame, str(i), (50, 1000), 0, 1, 255)
-        
+
         # Display images
         cv2.imshow('behaviour', mouse_frame)
-        cv2.imshow('data - wavelet reconstruction', reconstruction_from_wavelet)
+        #        cv2.imshow('depth',depth_frame)
 
         # stop video when donw
         if (frame_num_mouse) % 500 == 0:
@@ -368,4 +450,4 @@ while True:
         print('Problem with Video Playback...')
         cv2.waitKey(int(500))
 
-mouse_vid.release()
+# depth_vid.release()
